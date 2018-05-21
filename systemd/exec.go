@@ -1,4 +1,4 @@
-package main
+package systemd
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ type systemdExec struct {
 	conn *dbus.Conn
 }
 
-func SystemdExec(cmd []string) error {
+func Exec(cmd []string) error {
 	var se systemdExec
 	var ch = make(chan string)
 	var properties = []dbus.Property{
