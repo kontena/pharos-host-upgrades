@@ -11,16 +11,15 @@ type Options struct {
 }
 
 func run(options Options) error {
-	log.Printf("cmd: %v", options.Cmd)
+	host, err := probeHost(options)
+	if err != nil {
+		return err
+	}
 
 	runUpgrade := func() {
 		log.Printf("Running host upgrades...")
 
-		if err := SystemdExec(options.Cmd); err != nil {
-			log.Fatalf("exec %v: %v", options.Cmd, err)
-		} else {
-			log.Printf("exec %v", options.Cmd)
-		}
+		host.Upgrade()
 	}
 
 	if runner, err := scheduledRunner(options, runUpgrade); err != nil {
