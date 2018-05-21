@@ -6,21 +6,39 @@ import (
 )
 
 type Options struct {
-	cmd []string
+	Schedule string
+	Cmd      []string
 }
 
 func run(options Options) error {
-	log.Printf("exec: %v", options.cmd)
+	log.Printf("cmd: %v", options.Cmd)
 
-	return SystemdExec(options.cmd)
+	runUpgrade := func() {
+		log.Printf("Running host upgrades...")
+
+		if err := SystemdExec(options.Cmd); err != nil {
+			log.Fatalf("exec %v: %v", options.Cmd, err)
+		} else {
+			log.Printf("exec %v", options.Cmd)
+		}
+	}
+
+	if runner, err := scheduledRunner(options, runUpgrade); err != nil {
+		return err
+	} else {
+		runner()
+	}
+
+	return nil
 }
 
 func main() {
 	var options Options
 
+	flag.StringVar(&options.Schedule, "schedule", "", "Scheduled upgrade (cron syntax)")
 	flag.Parse()
 
-	options.cmd = flag.Args()
+	options.Cmd = flag.Args()
 
 	if err := run(options); err != nil {
 		log.Fatalf("%v", err)
