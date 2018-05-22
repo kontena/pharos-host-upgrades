@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 )
 
 type Options struct {
@@ -17,15 +18,13 @@ func run(options Options) error {
 		return fmt.Errorf("Failed to probe host: %v", err)
 	}
 
-	kube, err := newKube(options)
+	kube, err := makeKube(options)
 	if err != nil {
 		return fmt.Errorf("Failed to connect to kube: %v", err)
 	}
 
 	return runSchedule(options, func() error {
-		log.Printf("Running with kube lock...")
-
-		return withKubeLock(kube, func() error {
+		return kube.withLock(func() error {
 			log.Printf("Running host upgrades...")
 
 			return host.Upgrade()
@@ -37,9 +36,9 @@ func main() {
 	var options Options
 
 	flag.StringVar(&options.Schedule, "schedule", "", "Scheduled upgrade (cron syntax)")
-	flag.StringVar(&options.Kube.Namespace, "kube-namespace", "kube-system", "Name of kube Namespace")
-	flag.StringVar(&options.Kube.DaemonSet, "kube-daemonset", "pharos-host-upgrades", "Name of kube DaemonSet")
-	flag.StringVar(&options.Kube.DaemonSet, "kube-node", "", "Name of kube Node")
+	flag.StringVar(&options.Kube.Namespace, "kube-namespace", os.Getenv("KUBE_NAMESPACE"), "Name of kube Namespace")
+	flag.StringVar(&options.Kube.DaemonSet, "kube-daemonset", os.Getenv("KUBE_DAEMONSET"), "Name of kube DaemonSet")
+	flag.StringVar(&options.Kube.Node, "kube-node", os.Getenv("KUBE_NODE"), "Name of kube Node")
 	flag.Parse()
 
 	if err := run(options); err != nil {
