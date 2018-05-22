@@ -11,24 +11,31 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/kubernetes"
+	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/util/retry"
 )
 
 const LockAnnotation = "pharos-host-upgrades.kontena.io/lock"
 
-func MakeLock(kube *Kube) Lock {
-	return Lock{
-		client:     kube.client,
+func NewLock(kube *Kube) (*Lock, error) {
+	var lock = Lock{
 		namespace:  kube.options.Namespace,
 		name:       kube.options.DaemonSet,
 		annotation: LockAnnotation,
 		value:      kube.options.Node,
 	}
+
+	if client, err := appsv1client.NewForConfig(kube.config); err != nil {
+		return nil, err
+	} else {
+		lock.client = client
+	}
+
+	return &lock, nil
 }
 
 type Lock struct {
-	client     *kubernetes.Clientset
+	client     appsv1client.AppsV1Interface
 	namespace  string
 	name       string
 	annotation string
@@ -78,7 +85,7 @@ func (lock *Lock) clear(object runtime.Object) error {
 
 // get lock object
 func (lock *Lock) get() (runtime.Object, error) {
-	if obj, err := lock.client.Apps().DaemonSets(lock.namespace).Get(lock.name, metav1.GetOptions{}); err != nil {
+	if obj, err := lock.client.DaemonSets(lock.namespace).Get(lock.name, metav1.GetOptions{}); err != nil {
 		return nil, err
 	} else {
 		return obj, err
@@ -96,7 +103,7 @@ func (lock *Lock) watch(object runtime.Object) (watch.Interface, error) {
 		listOptions.ResourceVersion = accessor.GetResourceVersion()
 	}
 
-	if watcher, err := lock.client.Apps().DaemonSets(lock.namespace).Watch(listOptions); err != nil {
+	if watcher, err := lock.client.DaemonSets(lock.namespace).Watch(listOptions); err != nil {
 		return nil, err
 	} else {
 		return watcher, err
@@ -107,7 +114,7 @@ func (lock *Lock) watch(object runtime.Object) (watch.Interface, error) {
 func (lock *Lock) update(object *runtime.Object) error {
 	if ds1, ok := (*object).(*appsv1.DaemonSet); !ok {
 		return fmt.Errorf("Invalid object: %T", *object)
-	} else if ds2, err := lock.client.Apps().DaemonSets(lock.namespace).Update(ds1); err != nil {
+	} else if ds2, err := lock.client.DaemonSets(lock.namespace).Update(ds1); err != nil {
 		return err
 	} else {
 		*object = ds2
