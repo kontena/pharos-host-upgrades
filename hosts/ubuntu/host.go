@@ -41,10 +41,8 @@ func (host Host) Probe() (hosts.HostInfo, bool) {
 }
 
 func (host Host) exec(cmd []string) error {
-	if err := systemd.Exec(cmd); err != nil {
+	if err := systemd.Exec("host-upgrades", cmd); err != nil {
 		return fmt.Errorf("exec %v: %v", cmd, err)
-	} else {
-		log.Printf("hosts/ubuntu exec %v", cmd)
 	}
 
 	return nil
