@@ -52,17 +52,17 @@ func (lock *Lock) test(object runtime.Object) (value string, available bool, acq
 	if accessor, err := meta.Accessor(object); err != nil {
 		panic(err)
 	} else if value := accessor.GetAnnotations()[lock.annotation]; value == "" {
-		log.Printf("kube/lock %v: test %v: free", lock, value)
+		log.Printf("kube/lock %v: test %v=%v: free", lock, lock.annotation, value)
 
 		return value, true, false
 
 	} else if value == lock.value {
-		log.Printf("kube/lock %v: test %v: acquired", lock, value)
+		log.Printf("kube/lock %v: test %v=%v: acquired", lock, lock.annotation, value)
 
 		return value, true, true
 
 	} else {
-		log.Printf("kube/lock %v: test %v: locked", lock, value)
+		log.Printf("kube/lock %v: test %v=%v: locked", lock, lock.annotation, value)
 
 		return value, false, false
 	}
@@ -73,7 +73,7 @@ func (lock *Lock) set(object runtime.Object) error {
 	if accessor, err := meta.Accessor(object); err != nil {
 		panic(err)
 	} else {
-		log.Printf("kube/lock %v: set %v", lock, lock.value)
+		log.Printf("kube/lock %v: set %v=%v", lock, lock.annotation, lock.value)
 
 		accessor.GetAnnotations()[lock.annotation] = lock.value
 	}
@@ -87,9 +87,9 @@ func (lock *Lock) clear(object runtime.Object) error {
 	if accessor, err := meta.Accessor(object); err != nil {
 		panic(err)
 	} else if value := accessor.GetAnnotations()[lock.annotation]; value != lock.value {
-		return fmt.Errorf("Broken lock: %v, expected %v", value, lock.value)
+		return fmt.Errorf("Broken lock: %v=%v, expected %v", lock.annotation, value, lock.value)
 	} else {
-		log.Printf("kube/lock %v: clear %v", lock, value)
+		log.Printf("kube/lock %v: clear %v=%v", lock, lock.annotation, value)
 
 		delete(accessor.GetAnnotations(), lock.annotation)
 	}
