@@ -1,0 +1,21 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: host-upgrades
+rules:
+# locking
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  verbs:
+  - get
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  resourceNames:
+  - host-upgrades
+  verbs:
+  - update

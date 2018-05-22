@@ -1,3 +1,5 @@
 .*
 Dockerfile
-/vendor/
+vendor
+scripts
+resources
