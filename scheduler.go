@@ -11,12 +11,13 @@ import (
 type Scheduler struct {
 	option   string
 	schedule cron.Schedule
-	cron     *cron.Cron
+	ch       chan time.Time
 }
 
 func makeScheduler(options Options) (Scheduler, error) {
 	var scheduler = Scheduler{
 		option: options.Schedule,
+		ch:     make(chan time.Time),
 	}
 
 	if options.Schedule == "" {
@@ -32,32 +33,47 @@ func makeScheduler(options Options) (Scheduler, error) {
 	return scheduler, nil
 }
 
-func (scheduler Scheduler) run(f func() error) error {
-	if scheduler.schedule == nil {
-		return f()
-	}
+func (scheduler *Scheduler) run(f func() error) {
+	initTime := time.Now()
+	nextTime := scheduler.schedule.Next(initTime)
 
-	t0 := time.Now()
-	t1 := scheduler.schedule.Next(t0)
+	log.Printf("Using --schedule=%#v, first upgrade at: %v (in %v)", scheduler.option, nextTime, nextTime.Sub(initTime))
 
-	scheduler.cron = cron.New()
-	scheduler.cron.Schedule(scheduler.schedule, cron.FuncJob(func() {
-		t0 := time.Now()
-
+	for startTime := range scheduler.ch {
 		if err := f(); err != nil {
-			// TODO: break out of cron scheduler instead?
+			// TODO: break out of scheduler loop instead?
 			log.Fatalf("%v", err)
 		}
 
-		t1 := time.Now()
-		t2 := scheduler.schedule.Next(t1)
+		endTime := time.Now()
+		nextTime := scheduler.schedule.Next(endTime)
 
-		log.Printf("Schedule run completed in %v, next upgrade at: %v (in %v)", t1.Sub(t0), t2, t2.Sub(t1))
+		log.Printf("Schedule run completed in %v, next upgrade at: %v (in %v)", endTime.Sub(startTime), nextTime, nextTime.Sub(endTime))
+	}
+}
+
+func (scheduler *Scheduler) trigger() {
+	select {
+	case scheduler.ch <- time.Now():
+		return
+	default:
+		log.Printf("Scheduler is busy, skipping scheduled run")
+	}
+}
+
+func (scheduler Scheduler) Run(f func() error) error {
+	if scheduler.schedule == nil {
+		return f()
+	} else {
+		defer close(scheduler.ch)
+		go scheduler.run(f)
+	}
+
+	c := cron.New()
+	c.Schedule(scheduler.schedule, cron.FuncJob(func() {
+		scheduler.trigger()
 	}))
-
-	log.Printf("Using --schedule=%#v, first upgrade at: %v (in %v)", scheduler.option, t1, (t1.Sub(t0)))
-
-	scheduler.cron.Run()
+	c.Run()
 
 	return nil
 }

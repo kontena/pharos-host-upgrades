@@ -28,7 +28,7 @@ func run(options Options) error {
 		return err
 	}
 
-	return scheduler.run(func() error {
+	return scheduler.Run(func() error {
 		return kube.withLock(func() error {
 			log.Printf("Running host upgrades...")
 
