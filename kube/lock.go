@@ -17,16 +17,14 @@ import (
 
 const LockAnnotation = "pharos-host-upgrades.kontena.io/lock"
 
-func NewLock(kube *Kube) (*Lock, error) {
-	var lock = Lock{
+func MakeLock(kube *Kube) Lock {
+	return Lock{
 		client:     kube.client,
 		namespace:  kube.options.Namespace,
 		name:       kube.options.DaemonSet,
 		annotation: LockAnnotation,
 		value:      kube.options.Node,
 	}
-
-	return &lock, nil
 }
 
 type Lock struct {

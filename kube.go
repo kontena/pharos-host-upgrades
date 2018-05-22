@@ -13,9 +13,7 @@ func newKube(options Options) (*kube.Kube, error) {
 }
 
 func withKubeLock(k *kube.Kube, f func() error) error {
-	if kubeLock, err := kube.NewLock(k); err != nil {
-		return err
-	} else {
-		return kubeLock.With(f)
-	}
+	var kubeLock = kube.MakeLock(k)
+
+	return kubeLock.With(f)
 }
