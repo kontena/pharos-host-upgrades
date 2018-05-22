@@ -19,9 +19,6 @@ spec:
           command:
             - pharos-host-upgrades
           args:
-            - -logtostderr
-            - -v
-            - "7"
             - "--schedule=0 * * * *"
           env:
             - name: KUBE_NAMESPACE
