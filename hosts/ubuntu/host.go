@@ -11,10 +11,10 @@ import (
 
 const OperatingSystem = "Ubuntu"
 
+var upgradeCmd = []string{"/usr/bin/unattended-upgrade", "-v"}
 var osPrettyNameRegexp = regexp.MustCompile(`Ubuntu (\S+)( LTS)?`)
 
 type Host struct {
-	UpgradeCmd []string
 }
 
 func (host Host) Probe() (hosts.HostInfo, bool) {
@@ -51,7 +51,9 @@ func (host Host) exec(cmd []string) error {
 }
 
 func (host Host) Upgrade() error {
-	if err := host.exec(host.UpgradeCmd); err != nil {
+	log.Printf("hosts/ubuntu upgrade: %v", upgradeCmd)
+
+	if err := host.exec(upgradeCmd); err != nil {
 		return err
 	}
 

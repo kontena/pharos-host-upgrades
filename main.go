@@ -7,7 +7,6 @@ import (
 
 type Options struct {
 	Schedule string
-	Cmd      []string
 }
 
 func run(options Options) error {
@@ -36,8 +35,6 @@ func main() {
 
 	flag.StringVar(&options.Schedule, "schedule", "", "Scheduled upgrade (cron syntax)")
 	flag.Parse()
-
-	options.Cmd = flag.Args()
 
 	if err := run(options); err != nil {
 		log.Fatalf("%v", err)

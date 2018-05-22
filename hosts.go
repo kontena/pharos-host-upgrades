@@ -10,9 +10,7 @@ import (
 
 func probeHost(options Options) (hosts.Host, error) {
 	var hosts = []hosts.Host{
-		ubuntu.Host{
-			UpgradeCmd: options.Cmd,
-		},
+		ubuntu.Host{},
 	}
 
 	for _, host := range hosts {
