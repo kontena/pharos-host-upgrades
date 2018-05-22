@@ -34,3 +34,13 @@
   source = "https://github.com/SpComb/go-systemd.git"
   branch = "feature/hostname1"
   #version = "17.0.0"
+
+[[constraint]]
+  name = "k8s.io/client-go"
+  version = "kubernetes-1.10.3"
+[[override]]
+  name = "k8s.io/api"
+  version = "kubernetes-1.10.3"
+[[override]]
+  name = "k8s.io/apimachinery"
+  version = "kubernetes-1.10.3"
