@@ -15,19 +15,11 @@ func run(options Options) error {
 		return err
 	}
 
-	runUpgrade := func() {
+	return runSchedule(options, func() error {
 		log.Printf("Running host upgrades...")
 
-		host.Upgrade()
-	}
-
-	if runner, err := scheduledRunner(options, runUpgrade); err != nil {
-		return err
-	} else {
-		runner()
-	}
-
-	return nil
+		return host.Upgrade()
+	})
 }
 
 func main() {
