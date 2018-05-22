@@ -3,8 +3,10 @@ package systemd
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/coreos/go-systemd/dbus"
+	"github.com/coreos/go-systemd/sdjournal"
 	godbus "github.com/godbus/dbus"
 )
 
@@ -12,6 +14,7 @@ type systemdExec struct {
 	unit      string
 	cmd       []string
 	conn      *dbus.Conn
+	journal   *sdjournal.Journal
 	ch        chan string
 	jobStatus string
 }
@@ -26,6 +29,7 @@ func (se *systemdExec) connect() error {
 	return nil
 }
 
+// clear any existing failed unit, no-op if not loaded
 func (se *systemdExec) reset() error {
 	log.Printf("systemd/exec %v: reset", se.unit)
 
@@ -56,6 +60,56 @@ func (se *systemdExec) start() error {
 	return nil
 }
 
+// XXX: returns 0 if without error if unit does not exist?
+func (se *systemdExec) getServiceTimestamp(propertyName string) (uint64, error) {
+	if property, err := se.conn.GetUnitTypeProperty(se.unit, "Service", propertyName); err != nil {
+		return 0, fmt.Errorf("dbus.GetUnitTypeProperty %v: %v", propertyName, err)
+	} else if value, ok := property.Value.Value().(uint64); !ok {
+		return 0, fmt.Errorf("Invalid property value: %#v", property.Value)
+	} else {
+		return value, nil
+	}
+}
+
+func (se *systemdExec) openJournal() error {
+	if journal, err := sdjournal.NewJournal(); err != nil {
+		return fmt.Errorf("sdjournal.NewJournal: %v", err)
+	} else {
+		se.journal = journal
+	}
+
+	if err := se.journal.AddMatch("_SYSTEMD_UNIT=" + se.unit); err != nil {
+		return fmt.Errorf("sdjournal.AddMatch: %v", err)
+	}
+
+	if startTimestamp, err := se.getServiceTimestamp("ExecMainStartTimestamp"); err != nil {
+		return err
+	} else if err := se.journal.SeekRealtimeUsec(startTimestamp); err != nil {
+		return fmt.Errorf("sdjournal.SeekRealtimeUsec: %v", err)
+	}
+
+	return nil
+}
+
+func (se *systemdExec) readJournal() error {
+	for {
+		if n, err := se.journal.Next(); err != nil {
+			return fmt.Errorf("sdjournal.Next: %v", err)
+		} else if n == 0 {
+			break
+		} else if entry, err := se.journal.GetEntry(); err != nil {
+			return fmt.Errorf("sdjournal.GetEntry: %v", err)
+		} else {
+			var t = time.Unix(int64(entry.RealtimeTimestamp/1e6), int64(entry.RealtimeTimestamp%1e6*1e3))
+			var message = entry.Fields["MESSAGE"]
+
+			log.Printf("systemd/exec %v: journal %v: %v", se.unit, t, message)
+		}
+	}
+
+	return nil
+}
+
 func (se *systemdExec) wait() error {
 	log.Printf("systemd/exec %v: wait", se.unit)
 
@@ -78,7 +132,13 @@ func (se *systemdExec) show() error {
 }
 
 func (se *systemdExec) close() {
-	se.conn.Close()
+	if se.conn != nil {
+		se.conn.Close()
+	}
+
+	if se.journal != nil {
+		se.journal.Close()
+	}
 }
 
 func Exec(name string, cmd []string) error {
@@ -87,13 +147,12 @@ func Exec(name string, cmd []string) error {
 		cmd:  cmd,
 		ch:   make(chan string),
 	}
+	defer se.close()
 
 	log.Printf("systemd/exec %v: cmd=%v", se.unit, cmd)
 
 	if err := se.connect(); err != nil {
 		return err
-	} else {
-		defer se.close()
 	}
 
 	if err := se.reset(); err != nil {
@@ -104,7 +163,16 @@ func Exec(name string, cmd []string) error {
 		return err
 	}
 
+	// XXX: race if unit exit with success?
+	if err := se.openJournal(); err != nil {
+		return err
+	}
+
 	if err := se.wait(); err != nil {
+		return err
+	}
+
+	if err := se.readJournal(); err != nil {
 		return err
 	}
 

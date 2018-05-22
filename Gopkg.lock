@@ -6,10 +6,17 @@
   name = "github.com/coreos/go-systemd"
   packages = [
     "dbus",
-    "hostname1"
+    "hostname1",
+    "sdjournal"
   ]
   revision = "e146b7a178ebd21a356d31964f8f57fd15458844"
   source = "https://github.com/SpComb/go-systemd.git"
+
+[[projects]]
+  name = "github.com/coreos/pkg"
+  packages = ["dlopen"]
+  revision = "97fdf19511ea361ae1c100dd393cc47f8dcfa1e1"
+  version = "v4"
 
 [[projects]]
   name = "github.com/godbus/dbus"
@@ -26,6 +33,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "4ec53b5d3fdb46d203bfa49647cc07592ea88211a24eefd90a76c36ae0940a9f"
+  inputs-digest = "f8958ad6e720bf39acabdbc4dbc52ac6d60c775a3832107f7433a7c11a151b45"
   solver-name = "gps-cdcl"
   solver-version = 1
