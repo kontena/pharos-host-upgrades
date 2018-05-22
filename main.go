@@ -23,7 +23,12 @@ func run(options Options) error {
 		return fmt.Errorf("Failed to connect to kube: %v", err)
 	}
 
-	return runSchedule(options, func() error {
+	scheduler, err := makeScheduler(options)
+	if err != nil {
+		return err
+	}
+
+	return scheduler.run(func() error {
 		return kube.withLock(func() error {
 			log.Printf("Running host upgrades...")
 
