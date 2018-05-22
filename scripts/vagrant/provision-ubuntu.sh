@@ -26,9 +26,7 @@ apt-get install -y unattended-upgrades
 
 cat <<EOF >/etc/docker/daemon.json
 {
-    "storage-driver": "overlay2",
-    "iptables": false,
-    "ip-masq": false
+    "storage-driver": "overlay2"
 }
 EOF
 
