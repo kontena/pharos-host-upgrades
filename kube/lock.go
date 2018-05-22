@@ -48,13 +48,23 @@ func (lock *Lock) String() string {
 }
 
 // test for lock annotation
-func (lock *Lock) test(object runtime.Object) (bool, error) {
+func (lock *Lock) test(object runtime.Object) (value string, available bool, acquired bool) {
 	if accessor, err := meta.Accessor(object); err != nil {
 		panic(err)
-	} else if value := accessor.GetAnnotations()[lock.annotation]; value == "" || value == lock.value {
-		return true, nil
+	} else if value := accessor.GetAnnotations()[lock.annotation]; value == "" {
+		log.Printf("kube/lock %v: test %v: free", lock, value)
+
+		return value, true, false
+
+	} else if value == lock.value {
+		log.Printf("kube/lock %v: test %v: acquired", lock, value)
+
+		return value, true, true
+
 	} else {
-		return false, nil
+		log.Printf("kube/lock %v: test %v: locked", lock, value)
+
+		return value, false, false
 	}
 }
 
@@ -63,6 +73,8 @@ func (lock *Lock) set(object runtime.Object) error {
 	if accessor, err := meta.Accessor(object); err != nil {
 		panic(err)
 	} else {
+		log.Printf("kube/lock %v: set %v", lock, lock.value)
+
 		accessor.GetAnnotations()[lock.annotation] = lock.value
 	}
 
@@ -77,6 +89,8 @@ func (lock *Lock) clear(object runtime.Object) error {
 	} else if value := accessor.GetAnnotations()[lock.annotation]; value != lock.value {
 		return fmt.Errorf("Broken lock: %v, expected %v", value, lock.value)
 	} else {
+		log.Printf("kube/lock %v: clear %v", lock, value)
+
 		delete(accessor.GetAnnotations(), lock.annotation)
 	}
 
@@ -85,6 +99,8 @@ func (lock *Lock) clear(object runtime.Object) error {
 
 // get lock object
 func (lock *Lock) get() (runtime.Object, error) {
+	log.Printf("kube/lock %v: get", lock)
+
 	if obj, err := lock.client.DaemonSets(lock.namespace).Get(lock.name, metav1.GetOptions{}); err != nil {
 		return nil, fmt.Errorf("Get: %v", err)
 	} else {
@@ -93,11 +109,13 @@ func (lock *Lock) get() (runtime.Object, error) {
 }
 
 // Test lock object
-func (lock *Lock) Test() (bool, error) {
+func (lock *Lock) Test() (value string, acquired bool, err error) {
 	if object, err := lock.get(); err != nil {
-		return false, err
+		return "", false, err
 	} else {
-		return lock.test(object)
+		value, _, acquired := lock.test(object)
+
+		return value, acquired, nil
 	}
 }
 
@@ -112,6 +130,8 @@ func (lock *Lock) watch(object runtime.Object) (watch.Interface, error) {
 		listOptions.ResourceVersion = accessor.GetResourceVersion()
 	}
 
+	log.Printf("kube/lock %v: watch %#v", lock, listOptions)
+
 	if watcher, err := lock.client.DaemonSets(lock.namespace).Watch(listOptions); err != nil {
 		return nil, fmt.Errorf("Watch: %v", err)
 	} else {
@@ -121,6 +141,8 @@ func (lock *Lock) watch(object runtime.Object) (watch.Interface, error) {
 
 // update lock object
 func (lock *Lock) update(object *runtime.Object) error {
+	log.Printf("kube/lock %v: update", lock)
+
 	if ds1, ok := (*object).(*appsv1.DaemonSet); !ok {
 		panic(fmt.Errorf("Invalid object: %T", *object))
 	} else if ds2, err := lock.client.DaemonSets(lock.namespace).Update(ds1); err != nil {
@@ -135,19 +157,24 @@ func (lock *Lock) update(object *runtime.Object) error {
 func (lock *Lock) testEvent(event watch.Event) (bool, error) {
 	switch event.Type {
 	case watch.Modified:
-		return lock.test(event.Object)
+		if _, available, _ := lock.test(event.Object); available {
+			return true, nil
+		}
 	default:
 		return false, fmt.Errorf("Unexpected event: %v", event.Type)
 	}
+
+	return false, nil
 }
 
 // wait for lock to be free
 func (lock *Lock) wait() (runtime.Object, error) {
+	log.Printf("kube/lock %v: wait", lock)
+
 	if obj, err := lock.get(); err != nil {
-		return nil, err
-	} else if locked, err := lock.test(obj); err != nil {
-		return nil, err
-	} else if !locked {
+		return obj, err
+	} else if _, available, _ := lock.test(obj); available {
+		// fastpath
 		return obj, nil
 	} else if watcher, err := lock.watch(obj); err != nil {
 		return obj, err
@@ -160,6 +187,8 @@ func (lock *Lock) wait() (runtime.Object, error) {
 
 // attempt to acquire lock, assuming it is free
 func (lock *Lock) acquire(object runtime.Object) error {
+	log.Printf("kube/lock %v: acquire", lock)
+
 	if err := lock.set(object); err != nil {
 		return err
 	} else if err := lock.update(&object); err != nil {
@@ -184,6 +213,8 @@ func (lock *Lock) Acquire() error {
 
 // attempt to clear lock, assuming it is locked
 func (lock *Lock) release(object runtime.Object) error {
+	log.Printf("kube/lock %v: release", lock)
+
 	if err := lock.clear(object); err != nil {
 		return err
 	} else if err := lock.update(&object); err != nil {
