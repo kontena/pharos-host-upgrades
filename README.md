@@ -10,13 +10,13 @@ See [`resources`](./resources) for example kube manifests.
 
     apt-get install unattended-upgrades
 
-Disable `apt-periodic`:
+Disable `apt-periodic` `unattended-upgrades`:
 
 ```
 sed -i 's/APT::Periodic::Unattended-Upgrade .*/APT::Periodic::Unattended-Upgrade "0";/' /etc/apt/apt.conf.d/20auto-upgrades
 ```
 
-Alternatively:
+Alternatively, completely disable `apt-periodic`:
 
     systemctl stop apt-daily.timer apt-daily-upgrade.timer
     systemctl disable apt-daily.timer apt-daily-upgrade.timer
