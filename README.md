@@ -16,6 +16,25 @@ Requires `yum install yum-cron`.
 
 ## Usage
 
+#### Native
+
+The Go binary can be run natively, outside of Docker or Kube. It only requires `systemd` d-bus access.
+
+    sudo $GOPATH/bin/pharos-host-upgrades
+
+#### Docker
+
+Example `docker run` options:
+
+    docker run --rm --name host-upgrades -v $PWD/config:/etc/host-upgrades -v /run/host-upgrades:/run/host-upgrades -v /var/run/dbus:/var/run/dbus -v /run/log/journal:/run/log/journal --privileged kontena/pharos-host-upgrades
+
+#### Kubernetes
+
+See the [example kube resources](./resources):
+
+    kubectl apply -f ./resources
+
+### CLI Options
 ```
 Usage of pharos-host-upgrades:$ cd ^C
   -alsologtostderr
@@ -46,7 +65,7 @@ Usage of pharos-host-upgrades:$ cd ^C
     	comma-separated list of pattern=N settings for file-filtered logging
 ```
 
-### `--schedule`
+#### `--schedule`
 
 See https://godoc.org/github.com/robfig/cron#hdr-CRON_Expression_Format
 
