@@ -84,6 +84,8 @@ Using the vagrant machines:
     $ vagrant up ubuntu
     $ vagrant up centos-7
 
+Note that the `centos/7` box does not support shared folders... vagrant falls back to rsync, so you must `vagrant rsync centos-7` before building the image after any edits.
+
 ### Setup
 
     $ mkdir .kube
