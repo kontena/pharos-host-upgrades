@@ -1,10 +1,12 @@
 package hosts
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"text/template"
 )
 
 func testDir(path string) (bool, error) {
@@ -78,8 +80,7 @@ func (config *Config) Open(name string) (*os.File, error) {
 	return os.Open(config.Path(name))
 }
 
-// Copy config file to host mount, returning host path to copied file
-func (config *Config) CopyHostFile(name string) (string, error) {
+func (config *Config) WriteHostFile(name string, src io.Reader) (string, error) {
 	if config.mount == "" {
 		return "", fmt.Errorf("No host mount given")
 	}
@@ -88,19 +89,41 @@ func (config *Config) CopyHostFile(name string) (string, error) {
 	var tempPath = mountPath + ".tmp"
 	var hostPath = mountPath // assume same for now
 
-	if configFile, err := config.Open(name); err != nil {
-		return "", fmt.Errorf("Open config %v fie: %v", name, err)
-	} else if tempFile, err := os.Create(tempPath); err != nil {
+	if tempFile, err := os.Create(tempPath); err != nil {
 		return "", fmt.Errorf("Create host %v file: %v", name, err)
-	} else if _, err := io.Copy(tempFile, configFile); err != nil {
+	} else if _, err := io.Copy(tempFile, src); err != nil {
 		return "", fmt.Errorf("Copy to host %v file: %v", name, err)
 	} else if err := tempFile.Close(); err != nil {
 		return "", fmt.Errorf("Close host %v file: %v", name, err)
-	} else if err := configFile.Close(); err != nil {
-		return "", fmt.Errorf("Close config %v file: %v", name, err)
 	} else if err := os.Rename(tempPath, mountPath); err != nil {
 		return "", fmt.Errorf("Rename host %v file: %v", name, err)
 	}
 
 	return hostPath, nil
+}
+
+// Copy config file to host mount, returning host path to copied file
+func (config *Config) CopyHostFile(name string) (string, error) {
+	if configFile, err := config.Open(name); err != nil {
+		return "", fmt.Errorf("Open config %v file: %v", name, err)
+	} else {
+		defer configFile.Close()
+
+		return config.WriteHostFile(name, configFile)
+	}
+}
+
+func (config *Config) GenerateFile(name string, text string, data interface{}) (string, error) {
+	var t = template.New(name)
+	var buf bytes.Buffer
+
+	if _, err := t.Parse(text); err != nil {
+		return "", fmt.Errorf("Invalid template for %v: %v", name, err)
+	}
+
+	if err := t.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("Failed template for %v: %v", name, err)
+	}
+
+	return config.WriteHostFile(name, &buf)
 }

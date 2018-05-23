@@ -10,9 +10,21 @@ import (
 	godbus "github.com/godbus/dbus"
 )
 
+type ExecOptions struct {
+	Cmd []string
+	Env []string
+}
+
+func propEnvironment(envs []string) dbus.Property {
+	return dbus.Property{
+		Name:  "Environment",
+		Value: godbus.MakeVariant(envs),
+	}
+}
+
 type systemdExec struct {
 	unit      string
-	cmd       []string
+	options   ExecOptions
 	conn      *dbus.Conn
 	journal   *sdjournal.Journal
 	ch        chan string
@@ -47,8 +59,9 @@ func (se *systemdExec) reset() error {
 // fails if unit is already running
 func (se *systemdExec) start() error {
 	var properties = []dbus.Property{
-		dbus.PropExecStart(se.cmd, false), // XXX: bool flag meaning is inverted?
 		dbus.PropType("oneshot"),
+		propEnvironment(se.options.Env),
+		dbus.PropExecStart(se.options.Cmd, false), // XXX: bool flag meaning is inverted?
 	}
 
 	log.Printf("systemd/exec %v: start %#v", se.unit, properties)
@@ -141,15 +154,15 @@ func (se *systemdExec) close() {
 	}
 }
 
-func Exec(name string, cmd []string) error {
+func Exec(name string, options ExecOptions) error {
 	var se = systemdExec{
-		unit: fmt.Sprintf("%v.service", name),
-		cmd:  cmd,
-		ch:   make(chan string),
+		unit:    fmt.Sprintf("%v.service", name),
+		options: options,
+		ch:      make(chan string),
 	}
 	defer se.close()
 
-	log.Printf("systemd/exec %v: cmd=%v", se.unit, cmd)
+	log.Printf("systemd/exec %v: %#v", se.unit, options)
 
 	if err := se.connect(); err != nil {
 		return err
