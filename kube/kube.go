@@ -31,6 +31,18 @@ func New(options Options) (*Kube, error) {
 	return &kube, nil
 }
 
+func (kube *Kube) Node() (*Node, error) {
+	var node = Node{
+		name: kube.options.Node,
+	}
+
+	if err := node.connect(kube.config); err != nil {
+		return nil, err
+	}
+
+	return &node, nil
+}
+
 func (kube *Kube) Lock() (*Lock, error) {
 	var lock = Lock{
 		namespace:  kube.options.Namespace,
