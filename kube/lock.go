@@ -140,7 +140,7 @@ func (lock *Lock) update(object *runtime.Object) error {
 	if ds1, ok := (*object).(*appsv1.DaemonSet); !ok {
 		panic(fmt.Errorf("Invalid object: %T", *object))
 	} else if ds2, err := lock.client.DaemonSets(lock.namespace).Update(ds1); err != nil {
-		return fmt.Errorf("Update: %v", err)
+		return err // unmodified for RetryOnConflict
 	} else {
 		*object = ds2
 	}
