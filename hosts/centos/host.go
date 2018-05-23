@@ -11,7 +11,6 @@ import (
 
 const OperatingSystem = "CentOS"
 
-var upgradeCmd = "/usr/sbin/yum-cron"
 var osPrettyNameRegexp = regexp.MustCompile(`CentOS Linux (.+?)( \(.+?\))?`)
 
 type Host struct {
@@ -58,7 +57,7 @@ func (host *Host) Config(config hosts.Config) error {
 }
 
 func (host *Host) exec(cmd ...string) error {
-	if err := systemd.Exec("host-upgrades", cmd); err != nil {
+	if err := systemd.Exec("host-upgrades", systemd.ExecOptions{Cmd: cmd}); err != nil {
 		return fmt.Errorf("exec %v: %v", cmd, err)
 	}
 
@@ -66,11 +65,15 @@ func (host *Host) exec(cmd ...string) error {
 }
 
 func (host *Host) Upgrade() error {
-	log.Printf("hosts/centos upgrade: %v", upgradeCmd)
+	log.Printf("hosts/centos upgrade...")
 
 	if host.configPath == "" {
-		return host.exec(upgradeCmd)
+		log.Printf("hosts/centos upgrade... (default config)")
+
+		return host.exec("/usr/sbin/yum-cron")
 	} else {
-		return host.exec(upgradeCmd, host.configPath)
+		log.Printf("hosts/centos upgrade... (with config)")
+
+		return host.exec("/usr/sbin/yum-cron", host.configPath)
 	}
 }

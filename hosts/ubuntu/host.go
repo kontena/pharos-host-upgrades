@@ -11,11 +11,10 @@ import (
 
 const OperatingSystem = "Ubuntu"
 
-var updateCmd = []string{"/usr/bin/apt-get", "update"}
-var upgradeCmd = []string{"/usr/bin/unattended-upgrade", "-v"}
 var osPrettyNameRegexp = regexp.MustCompile(`Ubuntu (\S+)( LTS)?`)
 
 type Host struct {
+	configPath string
 }
 
 func (host *Host) Probe() (hosts.HostInfo, bool) {
@@ -42,26 +41,38 @@ func (host *Host) Probe() (hosts.HostInfo, bool) {
 }
 
 func (host *Host) Config(config hosts.Config) error {
+	if exists, err := config.FileExists("unattended-upgrades.conf"); err != nil {
+		return err
+	} else if !exists {
+		log.Printf("hosts/ubuntu: no unattended-upgrades.conf configured")
+	} else if configPath, err := config.CopyHostFile("unattended-upgrades.conf"); err != nil {
+		return fmt.Errorf("hosts/ubuntu failed to CopyHostFile unattended-upgrades.conf: %v", err)
+	} else {
+		log.Printf("hosts/ubuntu: using copied unattended-upgrades.conf at %v", configPath)
+
+		host.configPath = configPath
+	}
+
 	return nil
 }
 
-func (host *Host) exec(cmd []string) error {
-	if err := systemd.Exec("host-upgrades", cmd); err != nil {
-		return fmt.Errorf("exec %v: %v", cmd, err)
+func (host *Host) exec(name string, cmd ...string) error {
+	if err := systemd.Exec(name, systemd.ExecOptions{Cmd: cmd}); err != nil {
+		return fmt.Errorf("exec %v(%v): %v", name, cmd, err)
 	}
 
 	return nil
 }
 
 func (host *Host) Upgrade() error {
-	log.Printf("hosts/ubuntu upgrade: %v", upgradeCmd)
+	log.Printf("hosts/ubuntu upgrade...")
 
-	if err := host.exec(updateCmd); err != nil {
+	if err := host.exec("host-upgrades-update", "/usr/bin/apt-get", "update"); err != nil {
 		return err
 	}
 
-	if err := host.exec(upgradeCmd); err != nil {
-		return err
+	if host.configPath == "" {
+		return host.exec("host-upgrades", "/usr/bin/unattended-upgrade", "-v")
 	}
 
 	return nil
