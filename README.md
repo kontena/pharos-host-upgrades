@@ -66,7 +66,7 @@ Unattended-Upgrade::Allowed-Origins {
 };
 ```
 
-### Centos `yum-cron.conf`
+### CentOS `yum-cron.conf`
 
 Refer to the host `/etc/yum/yum-cron.conf` config file shipped by the `yum-cron` package.
 
