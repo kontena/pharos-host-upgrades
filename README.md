@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.com/kontena/pharos-host-upgrades.svg?token=pcXcAqCByqv2epJ6v1zo&branch=master)](https://travis-ci.com/kontena/pharos-host-upgrades)
+
 # pharos-host-upgrades
 
 See [`resources`](./resources) for example kube manifests.
