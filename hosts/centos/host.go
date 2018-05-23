@@ -1,6 +1,7 @@
 package centos
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"regexp"
@@ -13,8 +14,18 @@ const OperatingSystem = "CentOS"
 
 var osPrettyNameRegexp = regexp.MustCompile(`CentOS Linux (.+?)( \(.+?\))?`)
 
+const upgradeScript = `
+set -ue
+
+yum-cron ${CONFIG_PATH:-} | tee $HOST_PATH/yum-cron.out
+
+needs-restarting -r > $HOST_PATH/needs-restarting.out || touch -a $HOST_PATH/needs-restarting.stamp
+`
+
 type Host struct {
+	config     hosts.Config
 	configPath string
+	scriptPath string
 }
 
 func (host *Host) Probe() (hosts.HostInfo, bool) {
@@ -41,6 +52,12 @@ func (host *Host) Probe() (hosts.HostInfo, bool) {
 }
 
 func (host *Host) Config(config hosts.Config) error {
+	if path := config.HostPath(); path == "" {
+		return fmt.Errorf("hosts/centos requires --host-path")
+	} else {
+		host.config = config
+	}
+
 	if exists, err := config.FileExists("yum-cron.conf"); err != nil {
 		return err
 	} else if !exists {
@@ -53,27 +70,80 @@ func (host *Host) Config(config hosts.Config) error {
 		host.configPath = configPath
 	}
 
-	return nil
-}
+	if path, err := config.WriteHostFile("host-upgrades.sh", bytes.NewReader([]byte(upgradeScript)), hosts.FileModeScript); err != nil {
+		return err
+	} else {
+		log.Printf("hosts/centos: using generated host-upgrades.sh at %v", path)
 
-func (host *Host) exec(cmd ...string) error {
-	if err := systemd.Exec("host-upgrades", systemd.ExecOptions{Cmd: cmd}); err != nil {
-		return fmt.Errorf("exec %v: %v", cmd, err)
+		host.scriptPath = path
 	}
 
 	return nil
 }
 
-func (host *Host) Upgrade() error {
+func (host *Host) exec(env []string, cmd []string) error {
+	if err := systemd.Exec("host-upgrades", systemd.ExecOptions{Env: env, Cmd: cmd}); err != nil {
+		return fmt.Errorf("exec %v(%v): %v", "host-upgrades", cmd, err)
+	}
+
+	return nil
+}
+
+func (host *Host) readNeedsRestarting(status *hosts.Status) error {
+	if stat, exists, err := host.config.StatHostFile("needs-restarting.stamp"); err != nil {
+		return err
+	} else if !exists {
+		return nil
+	} else {
+		status.RebootRequired = true
+		status.RebootRequiredSince = stat.ModTime()
+	}
+
+	var buf bytes.Buffer
+
+	if err := host.config.ReadHostFile("needs-restarting.out", &buf); err != nil {
+		return err
+	} else {
+		status.RebootRequiredMessage = buf.String()
+	}
+
+	return nil
+}
+
+func (host *Host) readUpgradeLog(status *hosts.Status) error {
+	var buf bytes.Buffer
+
+	if err := host.config.ReadHostFile("yum-cron.out", &buf); err != nil {
+		return err
+	} else {
+		status.UpgradeLog = buf.String()
+	}
+
+	return nil
+}
+
+func (host *Host) Upgrade() (hosts.Status, error) {
+	var status hosts.Status
+
 	log.Printf("hosts/centos upgrade...")
 
-	if host.configPath == "" {
-		log.Printf("hosts/centos upgrade... (default config)")
-
-		return host.exec("/usr/sbin/yum-cron")
-	} else {
-		log.Printf("hosts/centos upgrade... (with config)")
-
-		return host.exec("/usr/sbin/yum-cron", host.configPath)
+	err := host.exec(
+		[]string{
+			"HOST_PATH=" + host.config.HostPath(),
+			"CONFIG_PATH=" + host.configPath,
+		},
+		[]string{"/bin/sh", "-x", host.scriptPath},
+	)
+	if err != nil {
+		return status, err
 	}
+
+	if err := host.readUpgradeLog(&status); err != nil {
+		return status, err
+	}
+	if err := host.readNeedsRestarting(&status); err != nil {
+		return status, err
+	}
+
+	return status, nil
 }
