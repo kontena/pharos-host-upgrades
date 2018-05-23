@@ -11,8 +11,8 @@ import (
 
 func probeHost(options Options) (hosts.Host, error) {
 	var hosts = []hosts.Host{
-		ubuntu.Host{},
-		centos.Host{},
+		&ubuntu.Host{},
+		&centos.Host{},
 	}
 
 	for _, host := range hosts {

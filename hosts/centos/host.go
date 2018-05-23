@@ -17,7 +17,7 @@ var osPrettyNameRegexp = regexp.MustCompile(`CentOS Linux (.+?)( \(.+?\))?`)
 type Host struct {
 }
 
-func (host Host) Probe() (hosts.HostInfo, bool) {
+func (host *Host) Probe() (hosts.HostInfo, bool) {
 	if hi, err := systemd.GetHostInfo(); err != nil {
 		log.Printf("hosts/centos probe failed: %v", err)
 
@@ -40,7 +40,11 @@ func (host Host) Probe() (hosts.HostInfo, bool) {
 	}
 }
 
-func (host Host) exec(cmd []string) error {
+func (host *Host) Config(config hosts.Config) error {
+	return nil
+}
+
+func (host *Host) exec(cmd []string) error {
 	if err := systemd.Exec("host-upgrades", cmd); err != nil {
 		return fmt.Errorf("exec %v: %v", cmd, err)
 	}
@@ -48,7 +52,7 @@ func (host Host) exec(cmd []string) error {
 	return nil
 }
 
-func (host Host) Upgrade() error {
+func (host *Host) Upgrade() error {
 	log.Printf("hosts/ubuntu upgrade: %v", upgradeCmd)
 
 	if err := host.exec(upgradeCmd); err != nil {
