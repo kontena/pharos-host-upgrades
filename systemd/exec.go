@@ -12,6 +12,14 @@ import (
 
 type ExecOptions struct {
 	Cmd []string
+	Env []string
+}
+
+func propEnvironment(envs []string) dbus.Property {
+	return dbus.Property{
+		Name:  "Environment",
+		Value: godbus.MakeVariant(envs),
+	}
 }
 
 type systemdExec struct {
@@ -51,8 +59,9 @@ func (se *systemdExec) reset() error {
 // fails if unit is already running
 func (se *systemdExec) start() error {
 	var properties = []dbus.Property{
-		dbus.PropExecStart(se.options.Cmd, false), // XXX: bool flag meaning is inverted?
 		dbus.PropType("oneshot"),
+		propEnvironment(se.options.Env),
+		dbus.PropExecStart(se.options.Cmd, false), // XXX: bool flag meaning is inverted?
 	}
 
 	log.Printf("systemd/exec %v: start %#v", se.unit, properties)
