@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/kontena/pharos-host-upgrades/hosts"
 	"github.com/kontena/pharos-host-upgrades/kube"
 )
 
@@ -76,7 +77,9 @@ func (k *Kube) initNode() error {
 
 		k.node = kubeNode
 	} else if err := kubeNode.InitCondition(UpgradeConditionType); err != nil {
-		return fmt.Errorf("Failed to initialize node %v condition: %v", kubeNode, err)
+		return fmt.Errorf("Failed to initialize node %v condition %v: %v", kubeNode, UpgradeConditionType, err)
+	} else if err := kubeNode.InitCondition(RebootConditionType); err != nil {
+		return fmt.Errorf("Failed to initialize node %v condition %v: %v", kubeNode, RebootConditionType, err)
 	} else {
 		log.Printf("Iniitialized kube node %v", kubeNode)
 
@@ -98,7 +101,7 @@ func (k Kube) WithLock(f func() error) error {
 }
 
 // Update node status condition based on function execution
-func (k Kube) UpdateHostStatus(upgradeErr error) error {
+func (k Kube) UpdateHostStatus(status hosts.Status, upgradeErr error) error {
 	if k.node == nil {
 		log.Printf("Skip kube node condition")
 		return nil
@@ -106,7 +109,10 @@ func (k Kube) UpdateHostStatus(upgradeErr error) error {
 
 	log.Printf("Update kube node %v condition with error: %v", k.node, upgradeErr)
 
-	if err := k.node.SetCondition(MakeUpgradeCondition(upgradeErr)); err != nil {
+	if err := k.node.SetCondition(
+		MakeUpgradeCondition(status, upgradeErr),
+		MakeRebootCondition(status),
+	); err != nil {
 		log.Printf("Failed to update node %v condition: %v", k.node, err)
 	}
 

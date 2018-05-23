@@ -43,11 +43,11 @@ func run(options Options) error {
 		return kube.WithLock(func() error {
 			log.Printf("Running host upgrades...")
 
-			if err := host.Upgrade(); err != nil {
-				kube.UpdateHostStatus(err)
+			if status, err := host.Upgrade(); err != nil {
+				kube.UpdateHostStatus(status, err)
 
 				return err
-			} else if err := kube.UpdateHostStatus(err); err != nil {
+			} else if err := kube.UpdateHostStatus(status, err); err != nil {
 				return fmt.Errorf("Kube node status update failed: %v", err)
 			} else {
 				return nil

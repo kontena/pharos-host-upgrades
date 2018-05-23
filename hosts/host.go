@@ -1,5 +1,9 @@
 package hosts
 
+import (
+	"time"
+)
+
 type HostInfo struct {
 	OperatingSystem        string
 	OperatingSystemRelease string
@@ -7,8 +11,16 @@ type HostInfo struct {
 	KernelRelease          string
 }
 
+type Status struct {
+	RebootRequired        bool
+	RebootRequiredSince   time.Time
+	RebootRequiredMessage string
+
+	UpgradeLog string
+}
+
 type Host interface {
 	Probe() (HostInfo, bool)
 	Config(Config) error
-	Upgrade() error
+	Upgrade() (Status, error)
 }
