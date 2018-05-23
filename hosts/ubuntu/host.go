@@ -1,6 +1,7 @@
 package ubuntu
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"regexp"
@@ -24,9 +25,26 @@ const aptConfTemplate = `
 Dir::Etc::main "{{.ConfigPath}}";
 `
 
+const upgradeScript = `
+set -ue
+
+apt-get update
+
+unattended-upgrade -v > $HOST_PATH/unattended-upgrade.out
+
+if [ -e /run/reboot-required ]; then
+	cp -a /run/reboot-required $HOST_PATH/reboot-required
+fi
+
+# TODO: also restart for service upgrades?
+# which needrestart && needrestart -b > $HOST_PATH/needrestart
+`
+
 type Host struct {
+	config        hosts.Config
 	configPath    string
 	aptConfigPath string
+	scriptPath    string
 }
 
 func (host *Host) Probe() (hosts.HostInfo, bool) {
@@ -53,6 +71,12 @@ func (host *Host) Probe() (hosts.HostInfo, bool) {
 }
 
 func (host *Host) Config(config hosts.Config) error {
+	if path := config.HostPath(); path == "" {
+		return fmt.Errorf("hosts/ubuntu requires --host-path")
+	} else {
+		host.config = config
+	}
+
 	if exists, err := config.FileExists("unattended-upgrades.conf"); err != nil {
 		return err
 	} else if !exists {
@@ -73,37 +97,81 @@ func (host *Host) Config(config hosts.Config) error {
 		host.aptConfigPath = path
 	}
 
-	return nil
-}
+	// Ubuntu has /run mounted noexec, so no point making this executable...
+	if path, err := config.WriteHostFile("host-upgrades.sh", bytes.NewReader([]byte(upgradeScript))); err != nil {
+		return err
+	} else {
+		log.Printf("hosts/ubuntu: using generated host-upgrades.sh at %v", path)
 
-func (host *Host) exec(name string, cmd ...string) error {
-	if err := systemd.Exec(name, systemd.ExecOptions{Cmd: cmd}); err != nil {
-		return fmt.Errorf("exec %v(%v): %v", name, cmd, err)
+		host.scriptPath = path
 	}
 
 	return nil
 }
 
-func (host *Host) execEnv(name string, env []string, cmd ...string) error {
-	if err := systemd.Exec(name, systemd.ExecOptions{Env: env, Cmd: cmd}); err != nil {
-		return fmt.Errorf("exec %v(%v): %v", name, cmd, err)
+func (host *Host) exec(env []string, cmd []string) error {
+	if err := systemd.Exec("host-upgrades", systemd.ExecOptions{Env: env, Cmd: cmd}); err != nil {
+		return fmt.Errorf("exec %v: %v", cmd, err)
 	}
 
 	return nil
 }
 
-func (host *Host) Upgrade() error {
+func (host *Host) readRebootRequired(status *hosts.Status) error {
+	if stat, exists, err := host.config.StatHostFile("reboot-required"); err != nil {
+		return err
+	} else if !exists {
+		return nil
+	} else {
+		status.RebootRequired = true
+		status.RebootRequiredSince = stat.ModTime()
+	}
+
+	var buf bytes.Buffer
+
+	if err := host.config.ReadHostFile("reboot-required", &buf); err != nil {
+		return err
+	} else {
+		status.RebootRequiredMessage = buf.String()
+	}
+
+	return nil
+}
+
+func (host *Host) readUpgradeLog(status *hosts.Status) error {
+	var buf bytes.Buffer
+
+	if err := host.config.ReadHostFile("unattended-upgrade.out", &buf); err != nil {
+		return err
+	} else {
+		status.UpgradeLog = buf.String()
+	}
+
+	return nil
+}
+
+func (host *Host) Upgrade() (hosts.Status, error) {
+	var status hosts.Status
+
 	log.Printf("hosts/ubuntu upgrade...")
 
-	if err := host.exec("host-upgrades-update", "/usr/bin/apt-get", "update"); err != nil {
-		return err
+	err := host.exec(
+		[]string{
+			"HOST_PATH=" + host.config.HostPath(),
+			"APT_CONFIG=" + host.aptConfigPath,
+		},
+		[]string{"/bin/sh", "-x", host.scriptPath},
+	)
+	if err != nil {
+		return status, err
 	}
 
-	if host.configPath == "" {
-		return host.exec("host-upgrades", "/usr/bin/unattended-upgrade", "-v")
-	} else {
-		return host.execEnv("host-upgrades", []string{"APT_CONFIG=" + host.aptConfigPath}, "/usr/bin/unattended-upgrade", "-v")
+	if err := host.readUpgradeLog(&status); err != nil {
+		return status, err
+	}
+	if err := host.readRebootRequired(&status); err != nil {
+		return status, err
 	}
 
-	return nil
+	return status, nil
 }
