@@ -9,6 +9,7 @@ import (
 
 type Options struct {
 	ConfigPath string
+	HostMount  string
 	Schedule   string
 	Kube       KubeOptions
 }
@@ -51,6 +52,7 @@ func main() {
 	var options Options
 
 	flag.StringVar(&options.ConfigPath, "config-path", "/etc/host-upgrades", "Path to configmap dir")
+	flag.StringVar(&options.HostMount, "host-mount", "/run/host-upgrades", "Path to host mount")
 	flag.StringVar(&options.Schedule, "schedule", "", "Scheduled upgrade (cron syntax)")
 	flag.StringVar(&options.Kube.Namespace, "kube-namespace", os.Getenv("KUBE_NAMESPACE"), "Name of kube Namespace (KUBE_NAMESPACE)")
 	flag.StringVar(&options.Kube.DaemonSet, "kube-daemonset", os.Getenv("KUBE_DAEMONSET"), "Name of kube DaemonSet (KUBE_DAEMONSET)")
