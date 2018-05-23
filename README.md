@@ -8,19 +8,37 @@ See [`resources`](./resources) for example kube manifests.
 
 #### Ubuntu 16.04
 
-Requires `apt-get install unattended-upgrades`.
+    apt-get install unattended-upgrades
+
+Disable `apt-periodic`:
+
+```
+sed -i 's/APT::Periodic::Unattended-Upgrade .*/APT::Periodic::Unattended-Upgrade "0";/' /etc/apt/apt.conf.d/20auto-upgrades
+```
+
+Alternatively:
+
+    systemctl stop apt-daily.timer apt-daily-upgrade.timer
+    systemctl disable apt-daily.timer apt-daily-upgrade.timer
 
 #### CentOS 7
 
-Requires `yum install yum-cron`.
+    yum install yum-cron
+
+Ensure that the `yum-cron` service is stopped and disabled, as this will interfere with `pharos-host-upgrades`:
+
+    systemctl stop yum-cron.service
+    systemctl disable yum-cron.service
 
 ## Usage
 
 #### Native
 
-The Go binary can be run natively, outside of Docker or Kube. It only requires `systemd` d-bus access.
+The Go binary can be run natively, outside of Docker or Kube:
 
     sudo $GOPATH/bin/pharos-host-upgrades
+
+This mode only requires `systemd` DBUS access. Kube locks and configs are not supported.
 
 #### Docker
 
