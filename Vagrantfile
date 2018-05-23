@@ -10,9 +10,17 @@ Vagrant.configure("2") do |config|
   # For a complete reference, please see the online documentation at
   # https://docs.vagrantup.com.
 
-  # Every Vagrant development environment requires a box. You can search for
-  # boxes at https://vagrantcloud.com/search.
-  config.vm.box = "ubuntu/xenial64"
+  # Ubuntu xenial
+  config.vm.define "ubuntu" do |ubuntu|
+    ubuntu.vm.box = "ubuntu/xenial64"
+    ubuntu.vm.provision "shell", path: 'scripts/vagrant/provision-ubuntu.sh'
+  end
+
+  # CentOS 7
+  config.vm.define "centos-7" do |machine|
+    machine.vm.box = "centos/7"
+    machine.vm.provision "shell", path: 'scripts/vagrant/provision-centos.sh'
+  end
 
   # Disable automatic box update checking. If you disable this, then
   # boxes will only be checked for updates when the user runs
@@ -57,9 +65,4 @@ Vagrant.configure("2") do |config|
   #
   # View the documentation for the provider you are using for more
   # information on available options.
-
-  # Enable provisioning with a shell script. Additional provisioners such as
-  # Puppet, Chef, Ansible, Salt, and Docker are also available. Please see the
-  # documentation for more information about their specific syntax and use.
-  config.vm.provision "shell", path: 'scripts/vagrant/provision-ubuntu.sh'
 end

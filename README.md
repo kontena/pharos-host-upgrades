@@ -41,3 +41,23 @@ Variant of a standard crontab with a leading seconds field.
 Examples:
 
 * `0 15 5 * * *` - every day at 05:15:00
+
+## Development
+
+Using the vagrant machines:
+
+    $ vagrant up ubuntu
+    $ vagrant up centos-7
+
+### Setup
+
+    $ mkdir .kube
+    $ sudo cat /etc/kubernetes/admin.conf > .kube/config
+
+### Build
+
+    /vagrant $ docker build -t kontena/pharos-host-upgrades:dev .
+
+### Test
+
+    /vagrant $ docker run --rm --name host-upgrades --privileged -v /var/run/dbus:/var/run/dbus -v /run/log/journal:/run/log/journal kontena/pharos-host-upgrades:dev
