@@ -45,9 +45,9 @@ func (host *Host) Config(config hosts.Config) error {
 	if exists, err := config.FileExists("yum-cron.conf"); err != nil {
 		return err
 	} else if !exists {
-
+		log.Printf("hosts/centos: no yum-cron.conf configured")
 	} else if configPath, err := config.CopyHostFile("yum-cron.conf"); err != nil {
-		return err
+		return fmt.Errorf("hosts/centos failed to CopyHostFile yum-cron.conf: %v", err)
 	} else {
 		log.Printf("hosts/centos: using copied yum-cron.conf at %v", configPath)
 
