@@ -48,7 +48,7 @@ func makeKube(options Options) (Kube, error) {
 }
 
 func (k *Kube) initLock() error {
-	if kubeLock, err := kube.NewLock(k.kube); err != nil {
+	if kubeLock, err := k.kube.Lock(); err != nil {
 		return err
 	} else if value, acquired, err := kubeLock.Test(); err != nil {
 		return fmt.Errorf("Failed to test lock %v: %v", kubeLock, err)
