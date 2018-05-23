@@ -15,7 +15,7 @@ func loadConfig(options Options) (hosts.Config, error) {
 	} else if exists, err := config.UsePath(path); err != nil {
 		return config, fmt.Errorf("Invalid --config-path=%v: %v", path, err)
 	} else if !exists {
-		return config, fmt.Errorf("Skipping non-existing --config-path=%v", path)
+		log.Printf("Skipping non-existing --config-path=%v", path)
 	} else {
 		log.Printf("Load config from --config-path=%v", path)
 	}
@@ -25,7 +25,7 @@ func loadConfig(options Options) (hosts.Config, error) {
 	} else if exists, err := config.UseMount(path); err != nil {
 		return config, fmt.Errorf("Invalid --host-mount=%v: %v", path, err)
 	} else if !exists {
-		return config, fmt.Errorf("Skipping non-existing --host-mount=%v", path)
+		log.Printf("Skipping non-existing --host-mount=%v", path)
 	} else {
 		log.Printf("Copying configs to --host-mount=%v", path)
 	}

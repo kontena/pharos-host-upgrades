@@ -80,6 +80,10 @@ func (config *Config) Open(name string) (*os.File, error) {
 
 // Copy config file to host mount, returning host path to copied file
 func (config *Config) CopyHostFile(name string) (string, error) {
+	if config.mount == "" {
+		return "", fmt.Errorf("No host mount given")
+	}
+
 	var mountPath = config.MountPath(name)
 	var tempPath = mountPath + ".tmp"
 	var hostPath = mountPath // assume same for now
