@@ -39,6 +39,7 @@ EOF
 sysctl --system
 
 # disable selinux for containers
+sed -i 's/SELINUX=.*/SELINUX=disabled/' /etc/sysconfig/selinux
 setenforce 0
 
 # configure cgroup driver
