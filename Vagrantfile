@@ -10,9 +10,16 @@ Vagrant.configure("2") do |config|
   # For a complete reference, please see the online documentation at
   # https://docs.vagrantup.com.
 
+  # Ubuntu xenial
   config.vm.define "ubuntu" do |ubuntu|
     ubuntu.vm.box = "ubuntu/xenial64"
     ubuntu.vm.provision "shell", path: 'scripts/vagrant/provision-ubuntu.sh'
+  end
+
+  # CentOS 7
+  config.vm.define "centos-7" do |machine|
+    machine.vm.box = "centos/7"
+    machine.vm.provision "shell", path: 'scripts/vagrant/provision-centos.sh'
   end
 
   # Disable automatic box update checking. If you disable this, then
