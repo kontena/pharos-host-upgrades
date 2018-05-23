@@ -40,10 +40,12 @@ func run(options Options) error {
 	}
 
 	return scheduler.Run(func() error {
-		return kube.withLock(func() error {
+		return kube.WithLock(func() error {
 			log.Printf("Running host upgrades...")
 
-			return host.Upgrade()
+			return kube.WithNodeCondition(func() error {
+				return host.Upgrade()
+			})
 		})
 	})
 }

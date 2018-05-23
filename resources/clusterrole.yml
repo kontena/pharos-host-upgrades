@@ -19,3 +19,15 @@ rules:
   - host-upgrades
   verbs:
   - update
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - nodes/status
+  verbs:
+  - update
