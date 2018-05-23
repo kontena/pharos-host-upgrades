@@ -10,8 +10,6 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
-const UpgradeConditionType corev1.NodeConditionType = "HostUpgrades"
-
 type Node struct {
 	client corev1client.CoreV1Interface
 	name   string
@@ -39,17 +37,21 @@ func (node *Node) get() (*corev1.Node, error) {
 	}
 }
 
-func (node *Node) setCondition(obj *corev1.Node, condition corev1.NodeCondition) error {
+func (node *Node) setCondition(obj *corev1.Node, condition corev1.NodeCondition) {
 	for i, c := range obj.Status.Conditions {
 		if c.Type == condition.Type {
 			obj.Status.Conditions[i] = condition
-			return nil
+			return
 		}
 	}
 
 	obj.Status.Conditions = append(obj.Status.Conditions, condition)
+}
 
-	return nil
+func (node *Node) setConditions(obj *corev1.Node, conditions []corev1.NodeCondition) {
+	for _, condition := range conditions {
+		node.setCondition(obj, condition)
+	}
 }
 
 func (node *Node) getCondition(obj *corev1.Node, conditionType corev1.NodeConditionType) (condition corev1.NodeCondition, exists bool) {
@@ -62,20 +64,6 @@ func (node *Node) getCondition(obj *corev1.Node, conditionType corev1.NodeCondit
 	return condition, false
 }
 
-func (node *Node) SetCondition(condition corev1.NodeCondition) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		if obj, err := node.get(); err != nil {
-			return err
-		} else if err := node.setCondition(obj, condition); err != nil {
-			return err
-		} else if _, err := node.client.Nodes().UpdateStatus(obj); err != nil {
-			return err // unmodified for RetryOnConflict
-		} else {
-			return nil
-		}
-	})
-}
-
 func (node *Node) GetCondition(conditionType corev1.NodeConditionType) (condition corev1.NodeCondition, exists bool, err error) {
 	if obj, err := node.get(); err != nil {
 		return condition, false, err
@@ -86,39 +74,32 @@ func (node *Node) GetCondition(conditionType corev1.NodeConditionType) (conditio
 	}
 }
 
-func (node *Node) HasUpgradeCondition() (bool, error) {
-	if _, exists, err := node.GetCondition(UpgradeConditionType); err != nil {
+func (node *Node) HasCondition(conditionType corev1.NodeConditionType) (bool, error) {
+	if _, exists, err := node.GetCondition(conditionType); err != nil {
 		return exists, err
 	} else {
 		return exists, nil
 	}
 }
 
-func (node *Node) InitUpgradeCondition() error {
-	var condition = corev1.NodeCondition{
-		Type:              UpgradeConditionType,
-		Status:            corev1.ConditionUnknown,
-		LastHeartbeatTime: metav1.Now(),
-	}
-
-	return node.SetCondition(condition)
+func (node *Node) SetCondition(conditions ...corev1.NodeCondition) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if obj, err := node.get(); err != nil {
+			return err
+		} else if node.setConditions(obj, conditions); err != nil { // XXX: control flow hack, can't fail
+			return err
+		} else if _, err := node.client.Nodes().UpdateStatus(obj); err != nil {
+			return err // unmodified for RetryOnConflict
+		} else {
+			return nil
+		}
+	})
 }
 
-func (node *Node) SetUpgradeCondition(err error) error {
-	var condition = corev1.NodeCondition{
-		Type:               UpgradeConditionType,
-		LastHeartbeatTime:  metav1.Now(),
-		LastTransitionTime: metav1.Now(), // XXX: only on changes?
-	}
-
-	if err == nil {
-		condition.Status = corev1.ConditionTrue
-		condition.Reason = "HostUpgradeDone"
-	} else {
-		condition.Status = corev1.ConditionFalse
-		condition.Reason = "HostUpgradeFailed"
-		condition.Message = err.Error()
-	}
-
-	return node.SetCondition(condition)
+func (node *Node) InitCondition(conditionType corev1.NodeConditionType) error {
+	return node.SetCondition(corev1.NodeCondition{
+		Type:              conditionType,
+		Status:            corev1.ConditionUnknown,
+		LastHeartbeatTime: metav1.Now(),
+	})
 }
