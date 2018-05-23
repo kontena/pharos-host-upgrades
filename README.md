@@ -60,4 +60,9 @@ Using the vagrant machines:
 
 ### Test
 
-    /vagrant $ docker run --rm --name host-upgrades --privileged -v /var/run/dbus:/var/run/dbus -v /run/log/journal:/run/log/journal kontena/pharos-host-upgrades:dev
+    /vagrant $ docker run --rm --name host-upgrades --privileged \
+      -v $PWD/config:/etc/host-upgrades \
+      -v /run/host-upgrades:/run/host-upgrades \
+      -v /var/run/dbus:/var/run/dbus \
+      -v /run/log/journal:/run/log/journal \
+      kontena/pharos-host-upgrades:dev

@@ -9,5 +9,6 @@ type HostInfo struct {
 
 type Host interface {
 	Probe() (HostInfo, bool)
+	Config(Config) error
 	Upgrade() error
 }

@@ -11,13 +11,14 @@ import (
 
 const OperatingSystem = "CentOS"
 
-var upgradeCmd = []string{"/usr/sbin/yum-cron"}
+var upgradeCmd = "/usr/sbin/yum-cron"
 var osPrettyNameRegexp = regexp.MustCompile(`CentOS Linux (.+?)( \(.+?\))?`)
 
 type Host struct {
+	configPath string
 }
 
-func (host Host) Probe() (hosts.HostInfo, bool) {
+func (host *Host) Probe() (hosts.HostInfo, bool) {
 	if hi, err := systemd.GetHostInfo(); err != nil {
 		log.Printf("hosts/centos probe failed: %v", err)
 
@@ -40,7 +41,23 @@ func (host Host) Probe() (hosts.HostInfo, bool) {
 	}
 }
 
-func (host Host) exec(cmd []string) error {
+func (host *Host) Config(config hosts.Config) error {
+	if exists, err := config.FileExists("yum-cron.conf"); err != nil {
+		return err
+	} else if !exists {
+		log.Printf("hosts/centos: no yum-cron.conf configured")
+	} else if configPath, err := config.CopyHostFile("yum-cron.conf"); err != nil {
+		return fmt.Errorf("hosts/centos failed to CopyHostFile yum-cron.conf: %v", err)
+	} else {
+		log.Printf("hosts/centos: using copied yum-cron.conf at %v", configPath)
+
+		host.configPath = configPath
+	}
+
+	return nil
+}
+
+func (host *Host) exec(cmd ...string) error {
 	if err := systemd.Exec("host-upgrades", cmd); err != nil {
 		return fmt.Errorf("exec %v: %v", cmd, err)
 	}
@@ -48,12 +65,12 @@ func (host Host) exec(cmd []string) error {
 	return nil
 }
 
-func (host Host) Upgrade() error {
-	log.Printf("hosts/ubuntu upgrade: %v", upgradeCmd)
+func (host *Host) Upgrade() error {
+	log.Printf("hosts/centos upgrade: %v", upgradeCmd)
 
-	if err := host.exec(upgradeCmd); err != nil {
-		return err
+	if host.configPath == "" {
+		return host.exec(upgradeCmd)
+	} else {
+		return host.exec(upgradeCmd, host.configPath)
 	}
-
-	return nil
 }
