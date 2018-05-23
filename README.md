@@ -4,6 +4,16 @@
 
 See [`resources`](./resources) for example kube manifests.
 
+### Supported host OS configurations
+
+#### Ubuntu 16.04
+
+Requires `apt-get install unattended-upgrades`.
+
+#### CentOS 7
+
+Requires `yum install yum-cron`.
+
 ## Usage
 
 ```
