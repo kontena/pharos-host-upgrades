@@ -52,6 +52,8 @@ See the [example kube resources](./resources):
 
     kubectl apply -f ./resources
 
+When configured to run within kube (using the `KUBE_*` envs), host upgrades will run with a lock on the kube daemonset, ensuring that only one host upgrades at a time.
+
 ### CLI Options
 ```
 Usage of pharos-host-upgrades:$ cd ^C
