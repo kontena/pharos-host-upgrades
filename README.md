@@ -7,9 +7,13 @@ See [`resources`](./resources) for example kube manifests.
 ## Usage
 
 ```
-Usage of pharos-host-upgrades:
+Usage of pharos-host-upgrades:$ cd ^C
   -alsologtostderr
     	log to standard error as well as files
+  -config-path string
+    	Path to configmap dir (default "/etc/host-upgrades")
+  -host-mount string
+    	Path to host mount (default "/run/host-upgrades")
   -kube-daemonset string
     	Name of kube DaemonSet (KUBE_DAEMONSET)
   -kube-namespace string
@@ -40,7 +44,38 @@ Variant of a standard crontab with a leading seconds field.
 
 Examples:
 
-* `0 15 5 * * *` - every day at 05:15:00
+* `0 15 5 * * *` - every day at 05:15:00u
+
+## Configuration
+
+The kube DaemonSet also supports an optional ConfigMap with configuration files for the host OS package upgrade tools. The ConfigMap should be mounted at `--config-path=/etc/host-upgrades`, and the `--host-mount=/run/host-upgrades` path should be bind-mounted from the host.
+
+### Ubuntu `unattended-upgrades.conf`
+
+Refer to the host `/etc/apt/apt.conf.d/50unattended-upgrades` config file shipped by the `unattended-upgrades` package.
+
+Note overriding the `Unattended-Upgrade::Allowed-Origins` list requires the use of a `#clear` directive, to have the list items in the config override those in the default host config, rather than merging the two lists together. See the sample [`unattended-upgrades.conf`](./config/unattended-upgrades.conf) for an example:
+
+```
+// Override system /etc/apt/apt.conf.d/50unattended-upgrades
+#clear "Unattended-Upgrade::Allowed-Origins";
+
+// Automatically upgrade packages from these (origin:archive) pairs
+Unattended-Upgrade::Allowed-Origins {
+  ...
+};
+```
+
+### Centos `yum-cron.conf`
+
+Refer to the host `/etc/yum/yum-cron.conf` config file shipped by the `yum-cron` package.
+
+Note that the default `random_sleep` value will delay upgrades across the entire cluster, and should be disabled. See the sample [`yum-cron.conf`](./config/yum-cron.conf) for an example:
+
+```
+[commands]
+random_sleep = 0
+```
 
 ## Development
 
