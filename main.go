@@ -40,10 +40,18 @@ func run(options Options) error {
 	}
 
 	return scheduler.Run(func() error {
-		return kube.withLock(func() error {
+		return kube.WithLock(func() error {
 			log.Printf("Running host upgrades...")
 
-			return host.Upgrade()
+			if err := host.Upgrade(); err != nil {
+				kube.UpdateHostStatus(err)
+
+				return err
+			} else if err := kube.UpdateHostStatus(err); err != nil {
+				return fmt.Errorf("Kube node status update failed: %v", err)
+			} else {
+				return nil
+			}
 		})
 	})
 }

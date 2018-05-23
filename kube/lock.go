@@ -12,27 +12,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 )
 
 const LockAnnotation = "pharos-host-upgrades.kontena.io/lock"
-
-func NewLock(kube *Kube) (*Lock, error) {
-	var lock = Lock{
-		namespace:  kube.options.Namespace,
-		name:       kube.options.DaemonSet,
-		annotation: LockAnnotation,
-		value:      kube.options.Node,
-	}
-
-	if client, err := appsv1client.NewForConfig(kube.config); err != nil {
-		return nil, err
-	} else {
-		lock.client = client
-	}
-
-	return &lock, nil
-}
 
 type Lock struct {
 	client     appsv1client.AppsV1Interface
@@ -45,6 +29,16 @@ type Lock struct {
 
 func (lock *Lock) String() string {
 	return fmt.Sprintf("%v/daemonsets/%v", lock.namespace, lock.name)
+}
+
+func (lock *Lock) connect(config *rest.Config) error {
+	if client, err := appsv1client.NewForConfig(config); err != nil {
+		return err
+	} else {
+		lock.client = client
+	}
+
+	return nil
 }
 
 // test for lock annotation
@@ -146,7 +140,7 @@ func (lock *Lock) update(object *runtime.Object) error {
 	if ds1, ok := (*object).(*appsv1.DaemonSet); !ok {
 		panic(fmt.Errorf("Invalid object: %T", *object))
 	} else if ds2, err := lock.client.DaemonSets(lock.namespace).Update(ds1); err != nil {
-		return fmt.Errorf("Update: %v", err)
+		return err // unmodified for RetryOnConflict
 	} else {
 		*object = ds2
 	}

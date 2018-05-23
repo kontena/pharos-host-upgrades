@@ -18,6 +18,7 @@ func (options KubeOptions) IsSet() bool {
 type Kube struct {
 	kube *kube.Kube
 	lock *kube.Lock
+	node *kube.Node
 }
 
 func makeKube(options Options) (Kube, error) {
@@ -44,11 +45,15 @@ func makeKube(options Options) (Kube, error) {
 		return k, err
 	}
 
+	if err := k.initNode(); err != nil {
+		return k, err
+	}
+
 	return k, nil
 }
 
 func (k *Kube) initLock() error {
-	if kubeLock, err := kube.NewLock(k.kube); err != nil {
+	if kubeLock, err := k.kube.Lock(); err != nil {
 		return err
 	} else if value, acquired, err := kubeLock.Test(); err != nil {
 		return fmt.Errorf("Failed to test lock %v: %v", kubeLock, err)
@@ -61,7 +66,27 @@ func (k *Kube) initLock() error {
 	return nil
 }
 
-func (k Kube) withLock(f func() error) error {
+func (k *Kube) initNode() error {
+	if kubeNode, err := k.kube.Node(); err != nil {
+		return err
+	} else if exists, err := kubeNode.HasCondition(UpgradeConditionType); err != nil {
+		return fmt.Errorf("Failed to check node %v condition: %v", kubeNode, err)
+	} else if exists {
+		log.Printf("Using kube node %v", kubeNode)
+
+		k.node = kubeNode
+	} else if err := kubeNode.InitCondition(UpgradeConditionType); err != nil {
+		return fmt.Errorf("Failed to initialize node %v condition: %v", kubeNode, err)
+	} else {
+		log.Printf("Iniitialized kube node %v", kubeNode)
+
+		k.node = kubeNode
+	}
+
+	return nil
+}
+
+func (k Kube) WithLock(f func() error) error {
 	if k.lock == nil {
 		log.Printf("Skip kube locking")
 		return f()
@@ -70,4 +95,20 @@ func (k Kube) withLock(f func() error) error {
 	log.Printf("Acquiring kube lock...")
 
 	return k.lock.With(f)
+}
+
+// Update node status condition based on function execution
+func (k Kube) UpdateHostStatus(upgradeErr error) error {
+	if k.node == nil {
+		log.Printf("Skip kube node condition")
+		return nil
+	}
+
+	log.Printf("Update kube node %v condition with error: %v", k.node, upgradeErr)
+
+	if err := k.node.SetCondition(MakeUpgradeCondition(upgradeErr)); err != nil {
+		log.Printf("Failed to update node %v condition: %v", k.node, err)
+	}
+
+	return nil
 }
