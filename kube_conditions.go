@@ -34,7 +34,7 @@ func MakeUpgradeCondition(status hosts.Status, err error) corev1.NodeCondition {
 	return condition
 }
 
-func MakeRebootCondition(status hosts.Status, info hosts.Info) corev1.NodeCondition {
+func MakeRebootCondition(status hosts.Status, info hosts.Info, upgradeErr error) corev1.NodeCondition {
 	var condition = corev1.NodeCondition{
 		Type:              RebootConditionType,
 		LastHeartbeatTime: metav1.Now(),
@@ -45,6 +45,10 @@ func MakeRebootCondition(status hosts.Status, info hosts.Info) corev1.NodeCondit
 		condition.LastTransitionTime = metav1.NewTime(status.RebootRequiredSince)
 		condition.Reason = "RebootRequired"
 		condition.Message = status.RebootRequiredMessage
+	} else if upgradeErr != nil {
+		condition.Status = corev1.ConditionUnknown
+		condition.LastTransitionTime = metav1.Now()
+		condition.Reason = "UpgradeFailed"
 	} else {
 		condition.Status = corev1.ConditionFalse
 		condition.LastTransitionTime = metav1.NewTime(info.BootTime)

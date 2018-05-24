@@ -114,7 +114,7 @@ func (k Kube) UpdateHostStatus(status hosts.Status, upgradeErr error) error {
 
 	if err := k.node.SetCondition(
 		MakeUpgradeCondition(status, upgradeErr),
-		MakeRebootCondition(status, k.host.Info()),
+		MakeRebootCondition(status, k.host.Info(), upgradeErr),
 	); err != nil {
 		log.Printf("Failed to update node %v condition: %v", k.node, err)
 	}
