@@ -16,10 +16,10 @@ func probeHost(options Options) (hosts.Host, error) {
 	}
 
 	for _, host := range hosts {
-		if hostInfo, ok := host.Probe(); !ok {
+		if ok := host.Probe(); !ok {
 			continue
 		} else {
-			log.Printf("Probed host: %#v", hostInfo)
+			log.Printf("Probed host: %v", host)
 
 			return host, nil
 		}

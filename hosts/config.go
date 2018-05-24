@@ -52,12 +52,17 @@ func (config *Config) UseMount(path string) (bool, error) {
 	}
 }
 
-func (config *Config) Path(name string) string {
-	return filepath.Join(config.path, name)
+func (config *Config) Path(name ...string) string {
+	return filepath.Join(append([]string{config.path}, name...)...)
 }
 
-func (config *Config) MountPath(name string) string {
-	return filepath.Join(config.mount, name)
+func (config *Config) MountPath(name ...string) string {
+	return filepath.Join(append([]string{config.mount}, name...)...)
+}
+
+func (config *Config) HostPath(name ...string) string {
+	// assume same for now
+	return filepath.Join(append([]string{config.mount}, name...)...)
 }
 
 func (config *Config) Stat(name string) (os.FileInfo, error) {
@@ -80,16 +85,58 @@ func (config *Config) Open(name string) (*os.File, error) {
 	return os.Open(config.Path(name))
 }
 
-func (config *Config) WriteHostFile(name string, src io.Reader) (string, error) {
+func (config *Config) StatHostFile(name string) (os.FileInfo, bool, error) {
+	if stat, err := os.Stat(config.MountPath(name)); err != nil && os.IsNotExist(err) {
+		return stat, false, nil
+	} else if err != nil {
+		return stat, false, err
+	} else {
+		return stat, true, nil
+	}
+}
+
+func (config *Config) ReadHostFile(name string, dst io.Writer) error {
+	if config.mount == "" {
+		return fmt.Errorf("No host mount given")
+	}
+
+	var mountPath = config.MountPath(name)
+
+	if file, err := os.Open(mountPath); err != nil {
+		return fmt.Errorf("Open host %v file: %v", name, err)
+	} else if _, err := io.Copy(dst, file); err != nil {
+		file.Close()
+		return fmt.Errorf("Copy from host %v file: %v", name, err)
+	} else if err := file.Close(); err != nil {
+		return fmt.Errorf("Close host %v file: %v", name, err)
+	} else {
+		return nil
+	}
+}
+
+const FileModeDefault = os.FileMode(0644)
+const FileModeScript = os.FileMode(0755)
+
+func (config *Config) WriteHostFile(name string, src io.Reader, opts ...interface{}) (string, error) {
 	if config.mount == "" {
 		return "", fmt.Errorf("No host mount given")
 	}
 
 	var mountPath = config.MountPath(name)
 	var tempPath = mountPath + ".tmp"
-	var hostPath = mountPath // assume same for now
+	var hostPath = mountPath
+	var fileMode = FileModeDefault
 
-	if tempFile, err := os.Create(tempPath); err != nil {
+	for _, opt := range opts {
+		switch val := opt.(type) {
+		case os.FileMode:
+			fileMode = val
+		default:
+			panic(fmt.Errorf("Invalid opt: %#v", opt))
+		}
+	}
+
+	if tempFile, err := os.OpenFile(tempPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, fileMode); err != nil {
 		return "", fmt.Errorf("Create host %v file: %v", name, err)
 	} else if _, err := io.Copy(tempFile, src); err != nil {
 		return "", fmt.Errorf("Copy to host %v file: %v", name, err)
