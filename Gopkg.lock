@@ -7,6 +7,7 @@
   packages = [
     "dbus",
     "hostname1",
+    "login1",
     "sdjournal"
   ]
   revision = "e146b7a178ebd21a356d31964f8f57fd15458844"
@@ -269,6 +270,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "214f3a73b7d5acd6130f0959601486028de9f233edba9157f14471d823df7d6a"
+  inputs-digest = "c2681346c1b6931c539ffb0a84adb79b403c5e2301edc4a74f1f71d5efb16d7b"
   solver-name = "gps-cdcl"
   solver-version = 1
