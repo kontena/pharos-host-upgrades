@@ -26,7 +26,7 @@ data:
 
     # Whether updates should be applied when they are available.  Note
     # that download_updates must also be yes for the update to be applied.
-    apply_updates = no
+    apply_updates = yes
 
     # Maximum amout of time to randomly sleep, in minutes.  The program
     # will sleep for a random amount of time between 0 and random_sleep
@@ -87,7 +87,7 @@ data:
 
     # Uncomment to auto-import new gpg keys (dangerous)
     # assumeyes = True
-    
+
   unattended-upgrades.conf: |
     // Override system /etc/apt/apt.conf.d/50unattended-upgrades
     #clear "Unattended-Upgrade::Allowed-Origins";
