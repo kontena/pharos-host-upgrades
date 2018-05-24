@@ -29,7 +29,7 @@ func run(options Options) error {
 		return fmt.Errorf("Failed to configure host: %v", err)
 	}
 
-	kube, err := makeKube(options)
+	kube, err := makeKube(options, host)
 	if err != nil {
 		return fmt.Errorf("Failed to connect to kube: %v", err)
 	}

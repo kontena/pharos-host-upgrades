@@ -20,10 +20,13 @@ type Kube struct {
 	kube *kube.Kube
 	lock *kube.Lock
 	node *kube.Node
+	host hosts.Host
 }
 
-func makeKube(options Options) (Kube, error) {
-	var k Kube
+func makeKube(options Options, host hosts.Host) (Kube, error) {
+	var k = Kube{
+		host: host,
+	}
 
 	if !options.Kube.IsSet() {
 		log.Printf("No --kube configuration")
@@ -111,7 +114,7 @@ func (k Kube) UpdateHostStatus(status hosts.Status, upgradeErr error) error {
 
 	if err := k.node.SetCondition(
 		MakeUpgradeCondition(status, upgradeErr),
-		MakeRebootCondition(status),
+		MakeRebootCondition(status, k.host.Info()),
 	); err != nil {
 		log.Printf("Failed to update node %v condition: %v", k.node, err)
 	}
