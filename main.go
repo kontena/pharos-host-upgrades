@@ -63,6 +63,8 @@ func run(options Options) error {
 			if options.Reboot && status.RebootRequired {
 				log.Printf("Rebooting host...")
 
+				// TODO: keep lock held while rebooting, and then release once booted
+				// XXX: race to kill us before we have a chance to finish...
 				if err := host.Reboot(); err != nil {
 					return fmt.Errorf("Failed to reboot host: %v", err)
 				}
