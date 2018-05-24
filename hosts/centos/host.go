@@ -163,3 +163,9 @@ func (host *Host) Upgrade() (hosts.Status, error) {
 		return status, nil
 	}
 }
+
+func (host *Host) Reboot() error {
+	log.Printf("hosts/centos reboot...")
+
+	return systemd.Reboot()
+}

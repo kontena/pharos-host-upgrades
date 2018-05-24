@@ -25,4 +25,5 @@ type Host interface {
 	Info() Info
 	Config(Config) error
 	Upgrade() (Status, error)
+	Reboot() error
 }
