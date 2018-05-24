@@ -42,33 +42,43 @@ fi
 `
 
 type Host struct {
-	config        hosts.Config
+	info   hosts.Info
+	config hosts.Config
+
 	configPath    string
 	aptConfigPath string
 	scriptPath    string
 }
 
-func (host *Host) Probe() (hosts.HostInfo, bool) {
+func (host *Host) Probe() bool {
 	if hi, err := systemd.GetHostInfo(); err != nil {
 		log.Printf("hosts/ubuntu probe failed: %v", err)
 
-		return hosts.HostInfo{}, false
+		return false
 	} else if match := osPrettyNameRegexp.FindStringSubmatch(hi.OperatingSystemPrettyName); match == nil {
 		log.Printf("hosts/ubuntu probe mismatch: %v", hi.OperatingSystemPrettyName)
 
-		return hosts.HostInfo{}, false
+		return false
 	} else {
-		log.Printf("hosts/ubuntu probe success: %#v", hi)
-
-		var hostInfo = hosts.HostInfo{
+		host.info = hosts.Info{
 			OperatingSystem:        OperatingSystem,
 			OperatingSystemRelease: match[1],
 			Kernel:                 hi.KernelName,
 			KernelRelease:          hi.KernelRelease,
 		}
 
-		return hostInfo, true
+		log.Printf("hosts/ubuntu probe success: %#v", host.info)
+
+		return true
 	}
+}
+
+func (host *Host) String() string {
+	return fmt.Sprintf("%v %v", host.info.OperatingSystem, host.info.OperatingSystemRelease)
+}
+
+func (host *Host) Info() hosts.Info {
+	return host.info
 }
 
 func (host *Host) Config(config hosts.Config) error {

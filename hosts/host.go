@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-type HostInfo struct {
+type Info struct {
 	OperatingSystem        string
 	OperatingSystemRelease string
 	Kernel                 string
@@ -20,7 +20,8 @@ type Status struct {
 }
 
 type Host interface {
-	Probe() (HostInfo, bool)
+	Probe() bool
+	Info() Info
 	Config(Config) error
 	Upgrade() (Status, error)
 }
