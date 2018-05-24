@@ -33,6 +33,7 @@ apt-get update
 unattended-upgrade -v > $HOST_PATH/unattended-upgrade.out
 
 if [ -e /run/reboot-required ]; then
+	# preserve timestamp
 	cp -a /run/reboot-required $HOST_PATH/reboot-required
 fi
 
@@ -71,10 +72,12 @@ func (host *Host) Probe() (hosts.HostInfo, bool) {
 }
 
 func (host *Host) Config(config hosts.Config) error {
-	if path := config.HostPath(); path == "" {
+	host.config = config // used for reading output...
+
+	if hostPath := config.HostPath(); hostPath == "" {
 		return fmt.Errorf("hosts/ubuntu requires --host-path")
 	} else {
-		host.config = config
+		log.Printf("hosts/ubuntu: using host path %v for output files", hostPath)
 	}
 
 	if exists, err := config.FileExists("unattended-upgrades.conf"); err != nil {
@@ -118,20 +121,17 @@ func (host *Host) exec(env []string, cmd []string) error {
 }
 
 func (host *Host) readRebootRequired(status *hosts.Status) error {
+	var buf bytes.Buffer
+
 	if stat, exists, err := host.config.StatHostFile("reboot-required"); err != nil {
 		return err
 	} else if !exists {
-		return nil
+
+	} else if err := host.config.ReadHostFile("reboot-required", &buf); err != nil {
+		return err
 	} else {
 		status.RebootRequired = true
 		status.RebootRequiredSince = stat.ModTime()
-	}
-
-	var buf bytes.Buffer
-
-	if err := host.config.ReadHostFile("reboot-required", &buf); err != nil {
-		return err
-	} else {
 		status.RebootRequiredMessage = buf.String()
 	}
 
@@ -152,26 +152,21 @@ func (host *Host) readUpgradeLog(status *hosts.Status) error {
 
 func (host *Host) Upgrade() (hosts.Status, error) {
 	var status hosts.Status
+	var env = []string{
+		"HOST_PATH=" + host.config.HostPath(),
+		"APT_CONFIG=" + host.aptConfigPath,
+	}
+	var cmd = []string{"/bin/sh", "-x", host.scriptPath}
 
 	log.Printf("hosts/ubuntu upgrade...")
 
-	err := host.exec(
-		[]string{
-			"HOST_PATH=" + host.config.HostPath(),
-			"APT_CONFIG=" + host.aptConfigPath,
-		},
-		[]string{"/bin/sh", "-x", host.scriptPath},
-	)
-	if err != nil {
+	if err := host.exec(env, cmd); err != nil {
 		return status, err
-	}
-
-	if err := host.readUpgradeLog(&status); err != nil {
+	} else if err := host.readUpgradeLog(&status); err != nil {
 		return status, err
-	}
-	if err := host.readRebootRequired(&status); err != nil {
+	} else if err := host.readRebootRequired(&status); err != nil {
 		return status, err
+	} else {
+		return status, nil
 	}
-
-	return status, nil
 }

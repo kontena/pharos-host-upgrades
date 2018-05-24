@@ -52,10 +52,12 @@ func (host *Host) Probe() (hosts.HostInfo, bool) {
 }
 
 func (host *Host) Config(config hosts.Config) error {
-	if path := config.HostPath(); path == "" {
+	host.config = config
+
+	if hostPath := config.HostPath(); hostPath == "" {
 		return fmt.Errorf("hosts/centos requires --host-path")
 	} else {
-		host.config = config
+		log.Printf("hosts/centos: using host path %v for output files", hostPath)
 	}
 
 	if exists, err := config.FileExists("yum-cron.conf"); err != nil {
@@ -83,27 +85,24 @@ func (host *Host) Config(config hosts.Config) error {
 
 func (host *Host) exec(env []string, cmd []string) error {
 	if err := systemd.Exec("host-upgrades", systemd.ExecOptions{Env: env, Cmd: cmd}); err != nil {
-		return fmt.Errorf("exec %v(%v): %v", "host-upgrades", cmd, err)
+		return fmt.Errorf("exec %v: %v", cmd, err)
 	}
 
 	return nil
 }
 
 func (host *Host) readNeedsRestarting(status *hosts.Status) error {
+	var buf bytes.Buffer
+
 	if stat, exists, err := host.config.StatHostFile("needs-restarting.stamp"); err != nil {
 		return err
 	} else if !exists {
-		return nil
+
+	} else if err := host.config.ReadHostFile("needs-restarting.out", &buf); err != nil {
+		return err
 	} else {
 		status.RebootRequired = true
 		status.RebootRequiredSince = stat.ModTime()
-	}
-
-	var buf bytes.Buffer
-
-	if err := host.config.ReadHostFile("needs-restarting.out", &buf); err != nil {
-		return err
-	} else {
 		status.RebootRequiredMessage = buf.String()
 	}
 
@@ -124,26 +123,21 @@ func (host *Host) readUpgradeLog(status *hosts.Status) error {
 
 func (host *Host) Upgrade() (hosts.Status, error) {
 	var status hosts.Status
+	var env = []string{
+		"HOST_PATH=" + host.config.HostPath(),
+		"CONFIG_PATH=" + host.configPath,
+	}
+	var cmd = []string{"/bin/sh", "-x", host.scriptPath}
 
 	log.Printf("hosts/centos upgrade...")
 
-	err := host.exec(
-		[]string{
-			"HOST_PATH=" + host.config.HostPath(),
-			"CONFIG_PATH=" + host.configPath,
-		},
-		[]string{"/bin/sh", "-x", host.scriptPath},
-	)
-	if err != nil {
+	if err := host.exec(env, cmd); err != nil {
 		return status, err
-	}
-
-	if err := host.readUpgradeLog(&status); err != nil {
+	} else if err := host.readUpgradeLog(&status); err != nil {
 		return status, err
-	}
-	if err := host.readNeedsRestarting(&status); err != nil {
+	} else if err := host.readNeedsRestarting(&status); err != nil {
 		return status, err
+	} else {
+		return status, nil
 	}
-
-	return status, nil
 }
