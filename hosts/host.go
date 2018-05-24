@@ -9,6 +9,7 @@ type Info struct {
 	OperatingSystemRelease string
 	Kernel                 string
 	KernelRelease          string
+	BootTime               time.Time
 }
 
 type Status struct {

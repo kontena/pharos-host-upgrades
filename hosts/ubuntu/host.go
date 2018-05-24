@@ -7,6 +7,7 @@ import (
 	"regexp"
 
 	"github.com/kontena/pharos-host-upgrades/hosts"
+	"github.com/kontena/pharos-host-upgrades/proc"
 	"github.com/kontena/pharos-host-upgrades/systemd"
 )
 
@@ -65,6 +66,14 @@ func (host *Host) Probe() bool {
 			OperatingSystemRelease: match[1],
 			Kernel:                 hi.KernelName,
 			KernelRelease:          hi.KernelRelease,
+		}
+
+		if procStat, err := proc.ReadStat(); err != nil {
+			log.Printf("hosts/ubuntu failed stat BootTime: %v", err)
+		} else {
+			log.Printf("hosts/ubuntu boot time: %v", procStat.BootTime)
+
+			host.info.BootTime = procStat.BootTime
 		}
 
 		log.Printf("hosts/ubuntu probe success: %#v", host.info)
