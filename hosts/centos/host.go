@@ -116,11 +116,15 @@ func (host *Host) readNeedsRestarting(status *hosts.Status) error {
 		return err
 	} else if !exists {
 
-	} else if err := host.config.ReadHostFile("needs-restarting.out", &buf); err != nil {
-		return err
 	} else {
 		status.RebootRequired = true
 		status.RebootRequiredSince = stat.ModTime()
+	}
+
+	// this will exist even without needs-restarting.stamp
+	if err := host.config.ReadHostFile("needs-restarting.out", &buf); err != nil {
+		return err
+	} else {
 		status.RebootRequiredMessage = buf.String()
 	}
 
