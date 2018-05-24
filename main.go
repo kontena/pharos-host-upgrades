@@ -40,6 +40,10 @@ func run(options Options) error {
 		return err
 	}
 
+	if options.Reboot {
+		log.Printf("Using --reboot, will reboot host after upgrades if required")
+	}
+
 	return scheduler.Run(func() error {
 		return kube.WithLock(func() error {
 			log.Printf("Running host upgrades...")
@@ -57,9 +61,13 @@ func run(options Options) error {
 			}
 
 			if options.Reboot && status.RebootRequired {
+				log.Printf("Rebooting host...")
+
 				if err := host.Reboot(); err != nil {
 					return fmt.Errorf("Failed to reboot host: %v", err)
 				}
+			} else if status.RebootRequired {
+				log.Printf("Skipping host reboot...")
 			}
 
 			return nil
