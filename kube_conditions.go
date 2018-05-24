@@ -17,14 +17,18 @@ func MakeUpgradeCondition(status hosts.Status, err error) corev1.NodeCondition {
 		LastTransitionTime: metav1.Now(), // only on changes?
 	}
 
-	if err == nil {
-		condition.Status = corev1.ConditionTrue
-		condition.Reason = "HostUpgradeDone"
+	if err != nil {
+		condition.Status = corev1.ConditionUnknown
+		condition.Reason = "UpgradeFailed"
+		condition.Message = err.Error()
+	} else if status.RebootRequired {
+		condition.Status = corev1.ConditionFalse
+		condition.Reason = "RebootRequired"
 		condition.Message = status.UpgradeLog
 	} else {
-		condition.Status = corev1.ConditionFalse
-		condition.Reason = "HostUpgradeFailed"
-		condition.Message = err.Error()
+		condition.Status = corev1.ConditionTrue
+		condition.Reason = "UpToDate"
+		condition.Message = status.UpgradeLog
 	}
 
 	return condition
