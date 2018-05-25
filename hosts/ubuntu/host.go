@@ -189,3 +189,9 @@ func (host *Host) Upgrade() (hosts.Status, error) {
 		return status, nil
 	}
 }
+
+func (host *Host) Reboot() error {
+	log.Printf("hosts/ubuntu reboot...")
+
+	return systemd.Reboot()
+}

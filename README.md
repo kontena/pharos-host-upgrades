@@ -56,13 +56,13 @@ When configured to run within kube (using the `KUBE_*` envs), host upgrades will
 
 ### CLI Options
 ```
-Usage of pharos-host-upgrades:$ cd ^C
+Usage of /home/kontena/go/bin/pharos-host-upgrades:
   -alsologtostderr
     	log to standard error as well as files
   -config-path string
     	Path to configmap dir (default "/etc/host-upgrades")
   -host-mount string
-    	Path to host mount (default "/run/host-upgrades")
+    	Path to shared mount with host. Must be under /run to reset when rebooting! (default "/run/host-upgrades")
   -kube-daemonset string
     	Name of kube DaemonSet (KUBE_DAEMONSET)
   -kube-namespace string
@@ -75,6 +75,10 @@ Usage of pharos-host-upgrades:$ cd ^C
     	If non-empty, write log files in this directory
   -logtostderr
     	log to standard error instead of files
+  -reboot
+    	Reboot if required
+  -reboot-timeout duration
+    	Wait for system to shutdown when rebooting (default 5m0s)
   -schedule string
     	Scheduled upgrade (cron syntax)
   -stderrthreshold value
