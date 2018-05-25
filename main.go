@@ -49,7 +49,11 @@ func run(options Options) error {
 	}
 
 	return scheduler.Run(func() error {
-		return kube.WithLock(func() error {
+		if err := kube.AcquireLock(); err != nil {
+			return fmt.Errorf("Failed to acquire kube lock: %v", err)
+		}
+
+		rebooting, upgradeErr := func() (bool, error) {
 			log.Printf("Running host upgrades...")
 
 			status, err := host.Upgrade()
@@ -57,34 +61,44 @@ func run(options Options) error {
 			if err != nil {
 				kube.UpdateHostStatus(status, err)
 
-				return err
+				return false, err
 			}
 
 			if err := kube.UpdateHostStatus(status, err); err != nil {
-				return fmt.Errorf("Kube node status update failed: %v", err)
+				return false, fmt.Errorf("Kube node status update failed: %v", err)
 			}
 
 			if options.Reboot && status.RebootRequired {
 				log.Printf("Rebooting host...")
 
 				if err := host.Reboot(); err != nil {
-					return fmt.Errorf("Failed to reboot host: %v", err)
+					return false, fmt.Errorf("Failed to reboot host: %v", err)
 				}
 
-				log.Printf("Waiting for host shutdown...")
+				log.Printf("Host is shutting down...")
 
-				// wait for reboot to happen... systemd will kill us, leaving the lock acquired
-				// XXX: this is up to implementation details: defer in goroutine does not execute when process exits
-				time.Sleep(options.RebootTimeout)
-
-				return fmt.Errorf("Timeout waiting for host to shutdown")
+				return true, nil // do not release kube lock
 
 			} else if status.RebootRequired {
 				log.Printf("Skipping host reboot...")
 			}
 
-			return nil
-		})
+			return false, nil
+		}()
+
+		if rebooting {
+			log.Printf("Leaving kube lock held for reboot...")
+		} else if err := kube.ReleaseLock(); err != nil {
+			if upgradeErr == nil {
+				return fmt.Errorf("Failed to release kube lock: %v", err)
+			} else {
+				log.Printf("Failed to release kube lock: %v", err)
+			}
+		} else {
+			log.Printf("Released kube lock")
+		}
+
+		return upgradeErr
 	})
 }
 

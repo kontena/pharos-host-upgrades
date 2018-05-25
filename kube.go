@@ -98,6 +98,25 @@ func (k *Kube) initNode() error {
 	return nil
 }
 
+func (k Kube) AcquireLock() error {
+	if k.lock == nil {
+		log.Printf("Skip kube locking")
+		return nil
+	}
+
+	log.Printf("Acquiring kube lock...")
+
+	return k.lock.Acquire()
+}
+
+func (k Kube) ReleaseLock() error {
+	if k.lock == nil {
+		log.Printf("Skip kube locking")
+		return nil
+	}
+	return k.lock.Release()
+}
+
 func (k Kube) WithLock(f func() error) error {
 	if k.lock == nil {
 		log.Printf("Skip kube locking")
