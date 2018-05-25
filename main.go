@@ -87,7 +87,13 @@ func run(options Options) error {
 		}()
 
 		if rebooting {
-			log.Printf("Leaving kube lock held for reboot...")
+			log.Printf("Leaving kube lock held for reboot, waiting for termination...")
+
+			// wait for systemd shutdown => docker terminate to kill us
+			time.Sleep(options.RebootTimeout)
+
+			return fmt.Errorf("Timeout waiting for host to shutdown")
+
 		} else if err := kube.ReleaseLock(); err != nil {
 			if upgradeErr == nil {
 				return fmt.Errorf("Failed to release kube lock: %v", err)
