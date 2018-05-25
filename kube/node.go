@@ -16,7 +16,7 @@ type Node struct {
 }
 
 func (node *Node) String() string {
-	return fmt.Sprintf("kube.Node[%v]", node.name)
+	return fmt.Sprintf("%v", node.name)
 }
 
 func (node *Node) connect(config *rest.Config) error {

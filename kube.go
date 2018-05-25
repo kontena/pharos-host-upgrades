@@ -73,20 +73,20 @@ func (k *Kube) initLock() error {
 func (k *Kube) initNode() error {
 	if kubeNode, err := k.kube.Node(); err != nil {
 		return err
-	} else if exists, err := kubeNode.HasCondition(UpgradeConditionType); err != nil {
-		return fmt.Errorf("Failed to check node %v condition: %v", kubeNode, err)
-	} else if exists {
-		log.Printf("Using kube node %v", kubeNode)
-
-		k.node = kubeNode
-	} else if err := kubeNode.InitCondition(UpgradeConditionType); err != nil {
-		return fmt.Errorf("Failed to initialize node %v condition %v: %v", kubeNode, UpgradeConditionType, err)
-	} else if err := kubeNode.InitCondition(RebootConditionType); err != nil {
-		return fmt.Errorf("Failed to initialize node %v condition %v: %v", kubeNode, RebootConditionType, err)
 	} else {
-		log.Printf("Iniitialized kube node %v", kubeNode)
-
 		k.node = kubeNode
+	}
+
+	if exists, err := k.node.HasCondition(UpgradeConditionType); err != nil {
+		return fmt.Errorf("Failed to check node %v condition: %v", k.node, err)
+	} else if exists {
+		log.Printf("Found kube node %v with existing conditions", k.node)
+	} else if err := k.node.InitCondition(UpgradeConditionType); err != nil {
+		return fmt.Errorf("Failed to initialize node %v condition %v: %v", k.node, UpgradeConditionType, err)
+	} else if err := k.node.InitCondition(RebootConditionType); err != nil {
+		return fmt.Errorf("Failed to initialize node %v condition %v: %v", k.node, RebootConditionType, err)
+	} else {
+		log.Printf("Initialized kube node %v conditions", k.node)
 	}
 
 	return nil
@@ -110,7 +110,7 @@ func (k Kube) UpdateHostStatus(status hosts.Status, upgradeErr error) error {
 		return nil
 	}
 
-	log.Printf("Update kube node %v condition with error: %v", k.node, upgradeErr)
+	log.Printf("Update kube node %v condition for status=%v with error: %v", k.node, status, upgradeErr)
 
 	if err := k.node.SetCondition(
 		MakeUpgradeCondition(status, upgradeErr),
