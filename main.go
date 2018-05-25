@@ -53,7 +53,7 @@ func run(options Options) error {
 			return fmt.Errorf("Failed to acquire kube lock: %v", err)
 		}
 
-		rebooting, upgradeErr := func() (bool, error) {
+		rebooting, err := func() (bool, error) {
 			log.Printf("Running host upgrades...")
 
 			status, err := host.Upgrade()
@@ -86,25 +86,29 @@ func run(options Options) error {
 			return false, nil
 		}()
 
-		if rebooting {
+		if err != nil {
+			log.Printf("Upgrade failed, releasing kube lock...")
+
+			if lockErr := kube.ReleaseLock(); lockErr != nil {
+				log.Printf("Failed to release kube lock: %v", lockErr)
+			}
+
+			return err
+
+		} else if rebooting {
 			log.Printf("Leaving kube lock held for reboot, waiting for termination...")
 
 			// wait for systemd shutdown => docker terminate to kill us
 			time.Sleep(options.RebootTimeout)
 
 			return fmt.Errorf("Timeout waiting for host to shutdown")
-
 		} else if err := kube.ReleaseLock(); err != nil {
-			if upgradeErr == nil {
-				return fmt.Errorf("Failed to release kube lock: %v", err)
-			} else {
-				log.Printf("Failed to release kube lock: %v", err)
-			}
+			return fmt.Errorf("Failed to release kube lock: %v", err)
 		} else {
 			log.Printf("Released kube lock")
 		}
 
-		return upgradeErr
+		return nil
 	})
 }
 

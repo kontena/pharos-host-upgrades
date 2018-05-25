@@ -114,6 +114,9 @@ func (k Kube) ReleaseLock() error {
 		log.Printf("Skip kube locking")
 		return nil
 	}
+
+	log.Printf("Releasing kube lock...")
+
 	return k.lock.Release()
 }
 
