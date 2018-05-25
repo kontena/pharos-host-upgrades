@@ -59,12 +59,18 @@ func makeKube(options Options, host hosts.Host) (Kube, error) {
 func (k *Kube) initLock() error {
 	if kubeLock, err := k.kube.Lock(); err != nil {
 		return err
-	} else if value, acquired, err := kubeLock.Test(); err != nil {
-		return fmt.Errorf("Failed to test lock %v: %v", kubeLock, err)
 	} else {
-		log.Printf("Using kube lock %v (acquired=%v, value=%v)", kubeLock, acquired, value)
-
 		k.lock = kubeLock
+	}
+
+	if value, acquired, err := k.lock.Test(); err != nil {
+		return fmt.Errorf("Failed to test lock %v: %v", k.lock, err)
+	} else if !acquired {
+		log.Printf("Using kube lock %v (not acquired, value=%v)", k.lock, value)
+	} else if err := k.lock.Release(); err != nil {
+		return fmt.Errorf("Failed to release lock %v: %v", k.lock, err)
+	} else {
+		log.Printf("Released kube lock %v (value=%v)", k.lock, value)
 	}
 
 	return nil
