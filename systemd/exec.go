@@ -3,6 +3,7 @@ package systemd
 import (
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/coreos/go-systemd/dbus"
@@ -11,8 +12,27 @@ import (
 )
 
 type ExecOptions struct {
-	Cmd []string
-	Env []string
+	Unit string // set to <name>.service
+	Cmd  []string
+	Env  []string
+}
+
+type ExecResult struct {
+	Status   string // job status
+	LogLines []string
+}
+
+func (result ExecResult) LogString() string {
+	return strings.Join(result.LogLines, "\n")
+}
+
+type ExecError struct {
+	Options ExecOptions
+	Result  ExecResult
+}
+
+func (err ExecError) Error() string {
+	return fmt.Sprintf("systemd/exec %v %v: %v\n%v", err.Options.Unit, err.Result.Status, err.Options.Cmd, err.Result.LogString())
 }
 
 func propEnvironment(envs []string) dbus.Property {
@@ -23,12 +43,11 @@ func propEnvironment(envs []string) dbus.Property {
 }
 
 type systemdExec struct {
-	unit      string
-	options   ExecOptions
-	conn      *dbus.Conn
-	journal   *sdjournal.Journal
-	ch        chan string
-	jobStatus string
+	unit    string
+	options ExecOptions
+	conn    *dbus.Conn
+	journal *sdjournal.Journal
+	ch      chan string
 }
 
 func (se *systemdExec) connect() error {
@@ -66,6 +85,7 @@ func (se *systemdExec) start() error {
 
 	log.Printf("systemd/exec %v: start %#v", se.unit, properties)
 
+	// fail => error if unit already exists because it's still running
 	if _, err := se.conn.StartTransientUnit(se.unit, "fail", properties, se.ch); err != nil {
 		return fmt.Errorf("dbus.StartTransientUnit %v: %v", se.unit, err)
 	}
@@ -73,7 +93,6 @@ func (se *systemdExec) start() error {
 	return nil
 }
 
-// XXX: returns 0 if without error if unit does not exist?
 func (se *systemdExec) getServiceTimestamp(propertyName string) (uint64, error) {
 	if property, err := se.conn.GetUnitTypeProperty(se.unit, "Service", propertyName); err != nil {
 		return 0, fmt.Errorf("dbus.GetUnitTypeProperty %v: %v", propertyName, err)
@@ -84,7 +103,9 @@ func (se *systemdExec) getServiceTimestamp(propertyName string) (uint64, error) 
 	}
 }
 
+// open journal for reading, if available
 func (se *systemdExec) openJournal() error {
+	// this silently succeeds if no journal files are available
 	if journal, err := sdjournal.NewJournal(); err != nil {
 		return fmt.Errorf("sdjournal.NewJournal: %v", err)
 	} else {
@@ -95,6 +116,7 @@ func (se *systemdExec) openJournal() error {
 		return fmt.Errorf("sdjournal.AddMatch: %v", err)
 	}
 
+	// XXX: returns 0 without error if unit does not exist?
 	if startTimestamp, err := se.getServiceTimestamp("ExecMainStartTimestamp"); err != nil {
 		return err
 	} else if err := se.journal.SeekRealtimeUsec(startTimestamp); err != nil {
@@ -104,31 +126,39 @@ func (se *systemdExec) openJournal() error {
 	return nil
 }
 
-func (se *systemdExec) readJournal() error {
+func (se *systemdExec) readJournal() ([]string, error) {
+	var lines []string
+
+	log.Printf("systemd/exec %v: read journal...", se.unit)
+
 	for {
 		if n, err := se.journal.Next(); err != nil {
-			return fmt.Errorf("sdjournal.Next: %v", err)
+			return lines, fmt.Errorf("sdjournal.Next: %v", err)
 		} else if n == 0 {
 			break
 		} else if entry, err := se.journal.GetEntry(); err != nil {
-			return fmt.Errorf("sdjournal.GetEntry: %v", err)
+			return lines, fmt.Errorf("sdjournal.GetEntry: %v", err)
 		} else {
 			var t = time.Unix(int64(entry.RealtimeTimestamp/1e6), int64(entry.RealtimeTimestamp%1e6*1e3))
 			var message = entry.Fields["MESSAGE"]
 
 			log.Printf("systemd/exec %v: journal %v: %v", se.unit, t, message)
+
+			lines = append(lines, message)
 		}
 	}
 
-	return nil
+	return lines, nil
 }
 
-func (se *systemdExec) wait() error {
-	log.Printf("systemd/exec %v: wait", se.unit)
+func (se *systemdExec) wait() (string, error) {
+	log.Printf("systemd/exec %v: wait...", se.unit)
 
-	se.jobStatus = <-se.ch
+	status := <-se.ch
 
-	return nil
+	log.Printf("systemd/exec %v: done, status=%v", se.unit, status)
+
+	return status, nil
 }
 
 func (se *systemdExec) show() error {
@@ -154,46 +184,57 @@ func (se *systemdExec) close() {
 	}
 }
 
-func Exec(name string, options ExecOptions) error {
+func Exec(name string, options ExecOptions) (ExecResult, error) {
+	options.Unit = fmt.Sprintf("%v.service", name)
+
 	var se = systemdExec{
-		unit:    fmt.Sprintf("%v.service", name),
+		unit:    options.Unit,
 		options: options,
 		ch:      make(chan string),
 	}
+	var result ExecResult
+
 	defer se.close()
 
 	log.Printf("systemd/exec %v: %#v", se.unit, options)
 
 	if err := se.connect(); err != nil {
-		return err
+		return result, err
 	}
 
 	if err := se.reset(); err != nil {
-		return err
+		return result, err
 	}
 
 	if err := se.start(); err != nil {
-		return err
+		return result, err
 	}
 
 	// XXX: race if unit exit with success?
 	if err := se.openJournal(); err != nil {
-		return err
+		return result, err
 	}
 
-	if err := se.wait(); err != nil {
-		return err
+	if status, err := se.wait(); err != nil {
+		return result, err
+	} else {
+		result.Status = status
 	}
 
-	if err := se.readJournal(); err != nil {
-		return err
+	if lines, err := se.readJournal(); err != nil {
+		return result, err
+	} else {
+		result.LogLines = lines
 	}
 
-	if se.jobStatus == "done" {
+	if result.Status == "done" {
 		log.Printf("systemd/exec %v: done", se.unit)
 	} else {
-		return fmt.Errorf("Job %v", se.jobStatus)
+		return result, ExecError{
+			Options: options,
+			Result:  result,
+		}
 	}
 
-	return nil
+	return result, nil
 }

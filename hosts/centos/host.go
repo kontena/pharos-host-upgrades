@@ -102,8 +102,8 @@ func (host *Host) Config(config hosts.Config) error {
 }
 
 func (host *Host) exec(env []string, cmd []string) error {
-	if err := systemd.Exec("host-upgrades", systemd.ExecOptions{Env: env, Cmd: cmd}); err != nil {
-		return fmt.Errorf("exec %v: %v", cmd, err)
+	if _, err := systemd.Exec("host-upgrades", systemd.ExecOptions{Env: env, Cmd: cmd}); err != nil {
+		return err
 	}
 
 	return nil
