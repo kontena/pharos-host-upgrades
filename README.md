@@ -16,10 +16,12 @@ Disable `apt-periodic` `unattended-upgrades`:
 sed -i 's/APT::Periodic::Unattended-Upgrade .*/APT::Periodic::Unattended-Upgrade "0";/' /etc/apt/apt.conf.d/20auto-upgrades
 ```
 
-Alternatively, completely disable `apt-periodic`:
+Alternatively, you can completely disable `apt-periodic`, as the upgrade process will also run `apt-get update` before the `unattended-upgrades`:
 
     systemctl stop apt-daily.timer apt-daily-upgrade.timer
     systemctl disable apt-daily.timer apt-daily-upgrade.timer
+
+The set of allowed origins for package upgrades can eitehr be configured via the system `/etc/apt/apt.conf.d/50unattended-upgrades` or using a [ConfigMap `unattended-upgrades.conf`](#ubuntu-unattended-upgradesconf), but the default settings are reasonable.
 
 #### CentOS 7
 
@@ -29,6 +31,8 @@ Ensure that the `yum-cron` service is stopped and disabled, as this will interfe
 
     systemctl stop yum-cron.service
     systemctl disable yum-cron.service
+
+The default `yum-cron.conf` `random_sleep = 360` should also be disabled, either via the default system `/etc/yum/yum-cron.conf` file, or using a [ConfigMap `yum-cron.conf`](#centos-yum-cronconf). The default `yum-cron.conf` will only download updates, and requires `apply_updates = yes` to actually upgrade the host.
 
 ## Kubernetes Integrations
 
