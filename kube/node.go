@@ -103,3 +103,108 @@ func (node *Node) InitCondition(conditionType corev1.NodeConditionType) error {
 		LastHeartbeatTime: metav1.Now(),
 	})
 }
+
+func (node *Node) setAnnotation(obj *corev1.Node, annotation string, value string) {
+	if obj.ObjectMeta.Annotations == nil {
+		obj.ObjectMeta.Annotations = make(map[string]string)
+	}
+
+	obj.ObjectMeta.Annotations[annotation] = value
+}
+
+func (node *Node) getAnnotation(obj *corev1.Node, annotation string) (string, bool) {
+	if value, ok := obj.ObjectMeta.Annotations[annotation]; !ok {
+		return "", false
+	} else {
+		return value, true
+	}
+}
+
+func (node *Node) clearAnnotation(obj *corev1.Node, annotation string) {
+	delete(obj.ObjectMeta.Annotations, annotation)
+}
+
+func (node *Node) GetAnnotation(annotation string) (string, bool, error) {
+	if obj, err := node.get(); err != nil {
+		return "", false, err
+	} else if value, exists := node.getAnnotation(obj, annotation); !exists {
+		return "", false, nil
+	} else {
+		return value, true, nil
+	}
+}
+
+func (node *Node) SetAnnotation(annotation string, value string) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if obj, err := node.get(); err != nil {
+			return err
+		} else if node.setAnnotation(obj, annotation, value); err != nil { // XXX: control flow hack, can't fail
+			return err
+		} else if _, err := node.client.Nodes().Update(obj); err != nil {
+			return err // unmodified for RetryOnConflict
+		} else {
+			return nil
+		}
+	})
+}
+
+func (node *Node) ClearAnnotation(annotation string) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if obj, err := node.get(); err != nil {
+			return err
+		} else if node.clearAnnotation(obj, annotation); err != nil { // XXX: control flow hack, can't fail
+			return err
+		} else if _, err := node.client.Nodes().Update(obj); err != nil {
+			return err // unmodified for RetryOnConflict
+		} else {
+			return nil
+		}
+	})
+}
+
+func (node *Node) SetUnschedulable(unschedulable bool) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		obj, err := node.get()
+		if err != nil {
+			return err
+		}
+
+		obj.Spec.Unschedulable = unschedulable
+
+		if _, err := node.client.Nodes().Update(obj); err != nil {
+			return err // unmodified for RetryOnConflict
+		} else {
+			return nil
+		}
+	})
+}
+
+// set node to schedulable if test-and-clear annotation
+func (node *Node) SetSchedulableIfAnnotated(annotation string) (changed bool, err error) {
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		changed = false
+
+		obj, err := node.get()
+		if err != nil {
+			return err
+		}
+
+		_, exists := node.getAnnotation(obj, annotation)
+		if !exists {
+			return nil
+		}
+
+		changed = true
+
+		node.clearAnnotation(obj, annotation)
+		obj.Spec.Unschedulable = false
+
+		if _, err := node.client.Nodes().Update(obj); err != nil {
+			return err // unmodified for RetryOnConflict
+		} else {
+			return nil
+		}
+	})
+
+	return changed, err
+}
