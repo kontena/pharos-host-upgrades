@@ -22,6 +22,8 @@ spec:
             - pharos-host-upgrades
           args:
             - "--schedule=0 * * * *"
+            - --reboot
+            - --drain
           env:
             - name: KUBE_NAMESPACE
               valueFrom:
