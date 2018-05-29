@@ -45,8 +45,12 @@ func run(options Options) error {
 		return err
 	}
 
-	if options.Reboot {
+	if options.Reboot && options.Drain {
+		log.Printf("Using --reboot --drain, will drain and reboot host after upgrades if required")
+	} else if options.Reboot {
 		log.Printf("Using --reboot, will reboot host after upgrades if required")
+	} else {
+		log.Printf("Skipping host reboot after upgrades")
 	}
 
 	return scheduler.Run(func() error {
@@ -70,15 +74,13 @@ func run(options Options) error {
 			}
 
 			if options.Reboot && status.RebootRequired {
+				log.Printf("Reboot required")
+
 				if !options.Drain {
-					log.Printf("Rebooting host without kube --drain...")
+					log.Printf("Rebooting without draining kube node (use --drain)...")
+				} else if err := kube.DrainNode(); err != nil {
+					return false, fmt.Errorf("Failed to drain kube node for host reboot: %v", err)
 				} else {
-					log.Printf("Reboot required, draining kube node...")
-
-					if err := kube.DrainNode(); err != nil {
-						return false, fmt.Errorf("Failed to drain kube node for host reboot: %v", err)
-					}
-
 					log.Printf("Kube node drained, rebooting...")
 				}
 

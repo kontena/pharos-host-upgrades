@@ -165,6 +165,8 @@ func (k Kube) UpdateHostStatus(status hosts.Status, upgradeErr error) error {
 }
 
 func (k Kube) DrainNode() error {
+	log.Printf("Draining kube node %v (with annotation %v)...", k.node, KubeDrainAnnotation)
+
 	if k.node == nil {
 		return fmt.Errorf("No --kube-node configured")
 	} else if err := k.node.SetAnnotation(KubeDrainAnnotation, "true"); err != nil {
