@@ -6,7 +6,11 @@ import (
 
 	"github.com/kontena/pharos-host-upgrades/hosts"
 	"github.com/kontena/pharos-host-upgrades/kube"
+	"github.com/kontena/pharos-host-upgrades/kubectl"
 )
+
+const KubeLockAnnotation = "pharos-host-upgrades.kontena.io/lock"
+const KubeDrainAnnotation = "pharos-host-upgrades.kontena.io/drain"
 
 type KubeOptions struct {
 	kube.Options
@@ -17,15 +21,17 @@ func (options KubeOptions) IsSet() bool {
 }
 
 type Kube struct {
-	kube *kube.Kube
-	lock *kube.Lock
-	node *kube.Node
-	host hosts.Host
+	options kube.Options
+	kube    *kube.Kube
+	lock    *kube.Lock
+	node    *kube.Node
+	host    hosts.Host
 }
 
 func makeKube(options Options, host hosts.Host) (Kube, error) {
 	var k = Kube{
-		host: host,
+		options: options.Kube.Options,
+		host:    host,
 	}
 
 	if !options.Kube.IsSet() {
@@ -57,7 +63,7 @@ func makeKube(options Options, host hosts.Host) (Kube, error) {
 }
 
 func (k *Kube) initLock() error {
-	if kubeLock, err := k.kube.Lock(); err != nil {
+	if kubeLock, err := k.kube.Lock(KubeLockAnnotation); err != nil {
 		return err
 	} else {
 		k.lock = kubeLock
@@ -93,6 +99,14 @@ func (k *Kube) initNode() error {
 		return fmt.Errorf("Failed to initialize node %v condition %v: %v", k.node, RebootConditionType, err)
 	} else {
 		log.Printf("Initialized kube node %v conditions", k.node)
+	}
+
+	if changed, err := k.node.SetSchedulableIfAnnotated(KubeDrainAnnotation); err != nil {
+		return fmt.Errorf("Failed to clear node drain state: %v", err)
+	} else if changed {
+		log.Printf("Uncordoned drained kube node %v (with annotation %v)", k.node, KubeDrainAnnotation)
+	} else {
+		log.Printf("Kube node %v is not marked as drained (with annotation %v)", k.node, KubeDrainAnnotation)
 	}
 
 	return nil
@@ -148,4 +162,18 @@ func (k Kube) UpdateHostStatus(status hosts.Status, upgradeErr error) error {
 	}
 
 	return nil
+}
+
+func (k Kube) DrainNode() error {
+	log.Printf("Draining kube node %v (with annotation %v)...", k.node, KubeDrainAnnotation)
+
+	if k.node == nil {
+		return fmt.Errorf("No --kube-node configured")
+	} else if err := k.node.SetAnnotation(KubeDrainAnnotation, "true"); err != nil {
+		return fmt.Errorf("Failed to set node annotation for drain: %v", err)
+	} else if err := kubectl.Drain(k.options.Node); err != nil {
+		return fmt.Errorf("Failed to drain node %v: %v", k.options.Node, err)
+	} else {
+		return nil
+	}
 }

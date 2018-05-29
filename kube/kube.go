@@ -43,11 +43,11 @@ func (kube *Kube) Node() (*Node, error) {
 	return &node, nil
 }
 
-func (kube *Kube) Lock() (*Lock, error) {
+func (kube *Kube) Lock(annotation string) (*Lock, error) {
 	var lock = Lock{
 		namespace:  kube.options.Namespace,
 		name:       kube.options.DaemonSet,
-		annotation: LockAnnotation,
+		annotation: annotation,
 		value:      kube.options.Node,
 	}
 
