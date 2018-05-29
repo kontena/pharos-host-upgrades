@@ -46,7 +46,7 @@ func run(options Options) error {
 	}
 
 	if options.Reboot && options.Drain {
-		log.Printf("Using --reboot --drain, will drain and reboot host after upgrades if required")
+		log.Printf("Using --reboot --drain, will drain kube node and reboot host after upgrades if required")
 	} else if options.Reboot {
 		log.Printf("Using --reboot, will reboot host after upgrades if required")
 	} else {
