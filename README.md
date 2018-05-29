@@ -30,6 +30,44 @@ Ensure that the `yum-cron` service is stopped and disabled, as this will interfe
     systemctl stop yum-cron.service
     systemctl disable yum-cron.service
 
+## Kubernetes Integrations
+
+When configured to run as a kube DaemonSet pod (using `KUBE_*` envs), the following kube API integrations can be used:
+
+### DaemonSet Locking
+
+The host upgrades will only run while holding a lock on the kube daemonset, ensuring that only one host upgrades at a time. This lock is also held during a reboot, and released once the pod restarts.
+
+The lock is implemented as a `pharos-host-upgrades.kontena.io/lock` annotation on the DaemonSet.
+
+### Node Draining
+
+If configured with `--reboot --drain`, the kube node will be drained before rebooting, marking the node as unschedulable and evicting pods to move them to other nodes for the duration of the reboot.
+
+The node will be uncordoned once the `host-upgrades` pod is restarted, but only if the `pharos-host-upgrades.kontena.io/drain` annotation was previously set as a result a drain + reboot triggered by the `host-upgrades` pod. If the pod is restarted while the node was otherwise drained, it will not be uncordoned.
+
+### Node Conditions
+
+The kube node `.Status.Conditions` will be updated based on the result of the host upgrades:
+
+#### `HostUpgrades`
+
+The `HostUpgrades` condition describes the state of the upgrade command itself.
+
+The condition will be `True` if the upgrade was run and the node is now up to date, with a message describing any packages upgraded during the last run.
+
+ The condition will be `False` if the host is not up to date. This will happen in the `RebootRequired` case, where the host requires a reboot to finish applying the upgrades.
+
+In case of the upgrade failing, the condition will be `Unknown`, with a message describing the error.
+
+#### `HostUpgradesReboot`
+
+The `HostUpgradesReboot` condition will be `True` if the host requires a reboot to finish applying upgrades, and `False` otherwise.
+
+### Supported Kube Versions
+
+ * Kubernetes 1.10
+
 ## Usage
 
 #### Native
@@ -52,23 +90,25 @@ See the [example kube resources](./resources):
 
     kubectl apply -f ./resources
 
-When configured to run within kube (using the `KUBE_*` envs), host upgrades will run with a lock on the kube daemonset, ensuring that only one host upgrades at a time.
+The DaemonSet configures the `KUBE_*` envs, enabling the kubernets integrations.
 
 ### CLI Options
 ```
-Usage of /home/kontena/go/bin/pharos-host-upgrades:
+Usage of pharos-host-upgrades:
   -alsologtostderr
     	log to standard error as well as files
   -config-path string
     	Path to configmap dir (default "/etc/host-upgrades")
+  -drain
+    	Drain kube node before reboot, uncordon after reboot
   -host-mount string
     	Path to shared mount with host. Must be under /run to reset when rebooting! (default "/run/host-upgrades")
   -kube-daemonset string
-    	Name of kube DaemonSet (KUBE_DAEMONSET)
+    	Name of kube DaemonSet (KUBE_DAEMONSET) (default "host-upgrades")
   -kube-namespace string
-    	Name of kube Namespace (KUBE_NAMESPACE)
+    	Name of kube Namespace (KUBE_NAMESPACE) (default "kube-system")
   -kube-node string
-    	Name of kube Node (KUBE_NODE)
+    	Name of kube Node (KUBE_NODE) (default "ubuntu-xenial")
   -log_backtrace_at value
     	when logging hits line file:N, emit a stack trace
   -log_dir string
@@ -87,6 +127,7 @@ Usage of /home/kontena/go/bin/pharos-host-upgrades:
     	log level for V logs
   -vmodule value
     	comma-separated list of pattern=N settings for file-filtered logging
+command terminated with exit code 2
 ```
 
 #### `--schedule`
@@ -97,7 +138,15 @@ Variant of a standard crontab with a leading seconds field.
 
 Examples:
 
-* `0 15 5 * * *` - every day at 05:15:00u
+* `0 15 5 * * *` - every day at 05:15:00
+
+#### `--reboot` `--reboot-timeout=...`
+
+Reboot the host after upgrades, if required.
+
+#### `--drain`
+
+Drain the kube node before rebooting, and uncordon once restarted.
 
 ## Configuration
 
