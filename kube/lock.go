@@ -16,8 +16,6 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
-const LockAnnotation = "pharos-host-upgrades.kontena.io/lock"
-
 type Lock struct {
 	client     appsv1client.AppsV1Interface
 	namespace  string

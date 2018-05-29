@@ -8,6 +8,8 @@ import (
 	"github.com/kontena/pharos-host-upgrades/kube"
 )
 
+const KubeLockAnnotation = "pharos-host-upgrades.kontena.io/lock"
+
 type KubeOptions struct {
 	kube.Options
 }
@@ -57,7 +59,7 @@ func makeKube(options Options, host hosts.Host) (Kube, error) {
 }
 
 func (k *Kube) initLock() error {
-	if kubeLock, err := k.kube.Lock(); err != nil {
+	if kubeLock, err := k.kube.Lock(KubeLockAnnotation); err != nil {
 		return err
 	} else {
 		k.lock = kubeLock
