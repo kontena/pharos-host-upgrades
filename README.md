@@ -21,7 +21,7 @@ Alternatively, you can completely disable `apt-periodic`, as the upgrade process
     systemctl stop apt-daily.timer apt-daily-upgrade.timer
     systemctl disable apt-daily.timer apt-daily-upgrade.timer
 
-The set of allowed origins for package upgrades can eitehr be configured via the system `/etc/apt/apt.conf.d/50unattended-upgrades` or using a [ConfigMap `unattended-upgrades.conf`](#ubuntu-unattended-upgradesconf), but the default settings are reasonable.
+The set of allowed origins for package upgrades can either be configured via the system `/etc/apt/apt.conf.d/50unattended-upgrades` or using a [ConfigMap `unattended-upgrades.conf`](#ubuntu-unattended-upgradesconf), but the default settings are reasonable.
 
 #### CentOS 7
 
