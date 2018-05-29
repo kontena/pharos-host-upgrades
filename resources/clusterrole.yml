@@ -31,3 +31,32 @@ rules:
   - nodes/status
   verbs:
   - update
+
+# drain
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - update
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - list
+  - get
+  - delete
+- apiGroups:
+  - extensions
+  resources:
+  - daemonsets
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - pods/eviction
+  verbs:
+  - create
