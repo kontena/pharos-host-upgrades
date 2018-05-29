@@ -66,6 +66,7 @@ func (se *systemdExec) start() error {
 
 	log.Printf("systemd/exec %v: start %#v", se.unit, properties)
 
+	// fail => error if unit already exists because it's still running
 	if _, err := se.conn.StartTransientUnit(se.unit, "fail", properties, se.ch); err != nil {
 		return fmt.Errorf("dbus.StartTransientUnit %v: %v", se.unit, err)
 	}
@@ -73,7 +74,6 @@ func (se *systemdExec) start() error {
 	return nil
 }
 
-// XXX: returns 0 if without error if unit does not exist?
 func (se *systemdExec) getServiceTimestamp(propertyName string) (uint64, error) {
 	if property, err := se.conn.GetUnitTypeProperty(se.unit, "Service", propertyName); err != nil {
 		return 0, fmt.Errorf("dbus.GetUnitTypeProperty %v: %v", propertyName, err)
@@ -84,7 +84,9 @@ func (se *systemdExec) getServiceTimestamp(propertyName string) (uint64, error) 
 	}
 }
 
+// open journal for reading, if available
 func (se *systemdExec) openJournal() error {
+	// this silently succeeds if no journal files are available
 	if journal, err := sdjournal.NewJournal(); err != nil {
 		return fmt.Errorf("sdjournal.NewJournal: %v", err)
 	} else {
@@ -95,6 +97,7 @@ func (se *systemdExec) openJournal() error {
 		return fmt.Errorf("sdjournal.AddMatch: %v", err)
 	}
 
+	// XXX: returns 0 without error if unit does not exist?
 	if startTimestamp, err := se.getServiceTimestamp("ExecMainStartTimestamp"); err != nil {
 		return err
 	} else if err := se.journal.SeekRealtimeUsec(startTimestamp); err != nil {
