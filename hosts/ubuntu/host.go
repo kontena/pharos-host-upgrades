@@ -51,15 +51,15 @@ type Host struct {
 	scriptPath    string
 }
 
-func (host *Host) Probe() bool {
+func (host *Host) Probe() (hosts.Info, bool) {
 	if hi, err := systemd.GetHostInfo(); err != nil {
 		log.Printf("hosts/ubuntu probe failed: %v", err)
 
-		return false
+		return host.info, false
 	} else if match := osPrettyNameRegexp.FindStringSubmatch(hi.OperatingSystemPrettyName); match == nil {
 		log.Printf("hosts/ubuntu probe mismatch: %v", hi.OperatingSystemPrettyName)
 
-		return false
+		return host.info, false
 	} else {
 		host.info = hosts.Info{
 			OperatingSystem:        OperatingSystem,
@@ -78,16 +78,12 @@ func (host *Host) Probe() bool {
 
 		log.Printf("hosts/ubuntu probe success: %#v", host.info)
 
-		return true
+		return host.info, true
 	}
 }
 
 func (host *Host) String() string {
 	return fmt.Sprintf("%v %v", host.info.OperatingSystem, host.info.OperatingSystemRelease)
-}
-
-func (host *Host) Info() hosts.Info {
-	return host.info
 }
 
 func (host *Host) Config(config hosts.Config) error {

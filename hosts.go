@@ -9,21 +9,21 @@ import (
 	"github.com/kontena/pharos-host-upgrades/hosts/ubuntu"
 )
 
-func probeHost(options Options) (hosts.Host, error) {
-	var hosts = []hosts.Host{
+func probeHost(options Options) (hosts.Host, hosts.Info, error) {
+	var probeHosts = []hosts.Host{
 		&ubuntu.Host{},
 		&centos.Host{},
 	}
 
-	for _, host := range hosts {
-		if ok := host.Probe(); !ok {
+	for _, host := range probeHosts {
+		if info, ok := host.Probe(); !ok {
 			continue
 		} else {
 			log.Printf("Probed host: %v", host)
 
-			return host, nil
+			return host, info, nil
 		}
 	}
 
-	return nil, fmt.Errorf("No hosts matched")
+	return nil, hosts.Info{}, fmt.Errorf("No hosts matched")
 }

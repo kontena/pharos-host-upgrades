@@ -4,6 +4,7 @@ import (
 	"time"
 )
 
+// Static host information, determined during probe, not expected to change without restarting
 type Info struct {
 	OperatingSystem        string
 	OperatingSystemRelease string
@@ -21,8 +22,7 @@ type Status struct {
 }
 
 type Host interface {
-	Probe() bool
-	Info() Info
+	Probe() (Info, bool)
 	Config(Config) error
 	Upgrade() (Status, error)
 	Reboot() error
