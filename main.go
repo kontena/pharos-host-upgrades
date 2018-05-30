@@ -35,15 +35,15 @@ func run(options Options) error {
 		return fmt.Errorf("Failed to configure host: %v", err)
 	}
 
-	// kube is optional, this will be nil if not configured; the methods are no-op when called on nil
-	kube, err := makeKube(options, hostInfo)
-	if err != nil {
-		return fmt.Errorf("Failed to connect to kube: %v", err)
-	}
-
 	scheduler, err := makeScheduler(options)
 	if err != nil {
 		return err
+	}
+
+	// kube is optional, this will be nil if not configured; the methods are no-op when called on nil
+	kube, err := makeKube(options, hostInfo)
+	if err != nil {
+		return fmt.Errorf("Failed to initialize kube: %v", err)
 	}
 
 	if options.Reboot && options.Drain {
@@ -75,17 +75,25 @@ func run(options Options) error {
 			}
 
 			if options.Reboot && status.RebootRequired {
-				log.Printf("Reboot required")
-
 				if !options.Drain {
-					log.Printf("Rebooting without draining kube node (use --drain)...")
-				} else if err := kube.DrainNode(); err != nil {
-					return false, fmt.Errorf("Failed to drain kube node for host reboot: %v", err)
+					log.Printf("Reboot required, rebooting without draining kube node...")
 				} else {
-					log.Printf("Kube node drained, rebooting...")
+					log.Printf("Reboot required, draining kube node...")
+
+					if err := kube.DrainNode(); err != nil {
+						// XXX: bad idea to release the lock with the node drained?
+						return false, fmt.Errorf("Failed to drain kube node for host reboot: %v", err)
+					} else if err := kube.MarkReboot(time.Now()); err != nil {
+						// XXX: bad idea to release the lock with the node drained?
+						return false, fmt.Errorf("Failed to mark kube node for host reboot: %v", err)
+					}
+
+					log.Printf("Rebooting...")
 				}
 
 				if err := host.Reboot(); err != nil {
+					// XXX: will enter a fail-loop while drained after restarting due to kube node reboot state if unable to reboot
+					// XXX: bad idea to release the lock with the node drained?
 					return false, fmt.Errorf("Failed to reboot host: %v", err)
 				}
 

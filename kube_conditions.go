@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -34,7 +36,7 @@ func MakeUpgradeCondition(status hosts.Status, err error) corev1.NodeCondition {
 	return condition
 }
 
-func MakeRebootCondition(status hosts.Status, info hosts.Info, upgradeErr error) corev1.NodeCondition {
+func MakeRebootCondition(info hosts.Info, status hosts.Status, upgradeErr error) corev1.NodeCondition {
 	var condition = corev1.NodeCondition{
 		Type:              RebootConditionType,
 		LastHeartbeatTime: metav1.Now(),
@@ -55,6 +57,32 @@ func MakeRebootCondition(status hosts.Status, info hosts.Info, upgradeErr error)
 		condition.Reason = "UpToDate"
 		condition.Message = status.RebootRequiredMessage
 	}
+
+	return condition
+}
+
+func MakeRebootConditionRebooting(rebootTime time.Time) corev1.NodeCondition {
+	var condition = corev1.NodeCondition{
+		Type:              RebootConditionType,
+		LastHeartbeatTime: metav1.Now(),
+	}
+
+	condition.Status = corev1.ConditionTrue
+	condition.LastTransitionTime = metav1.NewTime(rebootTime)
+	condition.Reason = "Rebooting"
+
+	return condition
+}
+
+func MakeRebootConditionRebooted(bootTime time.Time) corev1.NodeCondition {
+	var condition = corev1.NodeCondition{
+		Type:              RebootConditionType,
+		LastHeartbeatTime: metav1.Now(),
+	}
+
+	condition.Status = corev1.ConditionFalse
+	condition.LastTransitionTime = metav1.NewTime(bootTime)
+	condition.Reason = "Rebooted"
 
 	return condition
 }
