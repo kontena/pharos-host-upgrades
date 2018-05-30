@@ -21,17 +21,17 @@ func (options KubeOptions) IsSet() bool {
 }
 
 type Kube struct {
-	options kube.Options
-	kube    *kube.Kube
-	lock    *kube.Lock
-	node    *kube.Node
-	host    hosts.Host
+	options  kube.Options
+	kube     *kube.Kube
+	lock     *kube.Lock
+	node     *kube.Node
+	hostInfo hosts.Info
 }
 
-func makeKube(options Options, host hosts.Host) (Kube, error) {
+func makeKube(options Options, hostInfo hosts.Info) (Kube, error) {
 	var k = Kube{
-		options: options.Kube.Options,
-		host:    host,
+		options:  options.Kube.Options,
+		hostInfo: hostInfo,
 	}
 
 	if !options.Kube.IsSet() {
@@ -156,7 +156,7 @@ func (k Kube) UpdateHostStatus(status hosts.Status, upgradeErr error) error {
 
 	if err := k.node.SetCondition(
 		MakeUpgradeCondition(status, upgradeErr),
-		MakeRebootCondition(status, k.host.Info(), upgradeErr),
+		MakeRebootCondition(status, k.hostInfo, upgradeErr),
 	); err != nil {
 		log.Printf("Failed to update node %v condition: %v", k.node, err)
 	}

@@ -26,7 +26,7 @@ func run(options Options) error {
 		return fmt.Errorf("Failed to load config: %v", err)
 	}
 
-	host, err := probeHost(options)
+	host, hostInfo, err := probeHost(options)
 	if err != nil {
 		return fmt.Errorf("Failed to probe host: %v", err)
 	}
@@ -35,7 +35,7 @@ func run(options Options) error {
 		return fmt.Errorf("Failed to configure host: %v", err)
 	}
 
-	kube, err := makeKube(options, host)
+	kube, err := makeKube(options, hostInfo)
 	if err != nil {
 		return fmt.Errorf("Failed to connect to kube: %v", err)
 	}
