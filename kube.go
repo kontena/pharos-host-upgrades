@@ -28,7 +28,7 @@ type Kube struct {
 	hostInfo hosts.Info
 }
 
-func makeKube(options Options, hostInfo hosts.Info) (Kube, error) {
+func makeKube(options Options, hostInfo hosts.Info) (*Kube, error) {
 	var k = Kube{
 		options:  options.Kube.Options,
 		hostInfo: hostInfo,
@@ -36,7 +36,7 @@ func makeKube(options Options, hostInfo hosts.Info) (Kube, error) {
 
 	if !options.Kube.IsSet() {
 		log.Printf("No --kube configuration")
-		return k, nil
+		return nil, nil
 	}
 
 	log.Printf("Using --kube-namespace=%v --kube-daemonset=%v --kube-node=%v",
@@ -46,20 +46,20 @@ func makeKube(options Options, hostInfo hosts.Info) (Kube, error) {
 	)
 
 	if kube, err := kube.New(options.Kube.Options); err != nil {
-		return k, err
+		return nil, err
 	} else {
 		k.kube = kube
 	}
 
 	if err := k.initLock(); err != nil {
-		return k, err
+		return nil, err
 	}
 
 	if err := k.initNode(); err != nil {
-		return k, err
+		return nil, err
 	}
 
-	return k, nil
+	return &k, nil
 }
 
 func (k *Kube) initLock() error {
@@ -112,8 +112,8 @@ func (k *Kube) initNode() error {
 	return nil
 }
 
-func (k Kube) AcquireLock() error {
-	if k.lock == nil {
+func (k *Kube) AcquireLock() error {
+	if k == nil || k.lock == nil {
 		log.Printf("Skip kube locking")
 		return nil
 	}
@@ -123,9 +123,9 @@ func (k Kube) AcquireLock() error {
 	return k.lock.Acquire()
 }
 
-func (k Kube) ReleaseLock() error {
-	if k.lock == nil {
-		log.Printf("Skip kube locking")
+func (k *Kube) ReleaseLock() error {
+	if k == nil || k.lock == nil {
+		log.Printf("Skip kube unlocking")
 		return nil
 	}
 
@@ -134,8 +134,8 @@ func (k Kube) ReleaseLock() error {
 	return k.lock.Release()
 }
 
-func (k Kube) WithLock(f func() error) error {
-	if k.lock == nil {
+func (k *Kube) WithLock(f func() error) error {
+	if k == nil || k.lock == nil {
 		log.Printf("Skip kube locking")
 		return f()
 	}
@@ -146,9 +146,9 @@ func (k Kube) WithLock(f func() error) error {
 }
 
 // Update node status condition based on function execution
-func (k Kube) UpdateHostStatus(status hosts.Status, upgradeErr error) error {
-	if k.node == nil {
-		log.Printf("Skip kube node condition")
+func (k *Kube) UpdateHostStatus(status hosts.Status, upgradeErr error) error {
+	if k == nil || k.node == nil {
+		log.Printf("Skip updating kube node condition")
 		return nil
 	}
 
@@ -164,12 +164,14 @@ func (k Kube) UpdateHostStatus(status hosts.Status, upgradeErr error) error {
 	return nil
 }
 
-func (k Kube) DrainNode() error {
+func (k *Kube) DrainNode() error {
+	if k == nil || k.node == nil {
+		return fmt.Errorf("No --kube-node configured")
+	}
+
 	log.Printf("Draining kube node %v (with annotation %v)...", k.node, KubeDrainAnnotation)
 
-	if k.node == nil {
-		return fmt.Errorf("No --kube-node configured")
-	} else if err := k.node.SetAnnotation(KubeDrainAnnotation, "true"); err != nil {
+	if err := k.node.SetAnnotation(KubeDrainAnnotation, "true"); err != nil {
 		return fmt.Errorf("Failed to set node annotation for drain: %v", err)
 	} else if err := kubectl.Drain(k.options.Node); err != nil {
 		return fmt.Errorf("Failed to drain node %v: %v", k.options.Node, err)

@@ -35,6 +35,7 @@ func run(options Options) error {
 		return fmt.Errorf("Failed to configure host: %v", err)
 	}
 
+	// kube is optional, this will be nil if not configured; the methods are no-op when called on nil
 	kube, err := makeKube(options, hostInfo)
 	if err != nil {
 		return fmt.Errorf("Failed to connect to kube: %v", err)
@@ -124,7 +125,7 @@ func run(options Options) error {
 			return fmt.Errorf("Failed to release kube lock: %v", err)
 
 		} else {
-			log.Printf("Released kube lock")
+			log.Printf("Done")
 		}
 
 		return nil
