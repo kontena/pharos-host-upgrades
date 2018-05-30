@@ -11,15 +11,19 @@ Vagrant.configure("2") do |config|
   # https://docs.vagrantup.com.
 
   # Ubuntu xenial
-  config.vm.define "ubuntu" do |ubuntu|
-    ubuntu.vm.box = "ubuntu/xenial64"
-    ubuntu.vm.provision "shell", path: 'scripts/vagrant/provision-ubuntu.sh'
+  config.vm.define "ubuntu" do |machine|
+    machine.vm.box = "ubuntu/xenial64"
+    machine.vm.hostname = "ubuntu-xenial"
+    machine.vm.provision "shell", path: 'scripts/vagrant/provision-ubuntu.sh'
+    machine.vm.network "private_network", ip: "192.168.56.11"
   end
 
   # CentOS 7
   config.vm.define "centos-7" do |machine|
     machine.vm.box = "centos/7"
+    machine.vm.hostname = "centos-7"
     machine.vm.provision "shell", path: 'scripts/vagrant/provision-centos.sh'
+    machine.vm.network "private_network", ip: "192.168.56.12"
   end
 
   # Disable automatic box update checking. If you disable this, then
@@ -38,9 +42,6 @@ Vagrant.configure("2") do |config|
   # via 127.0.0.1 to disable public access
   # config.vm.network "forwarded_port", guest: 80, host: 8080, host_ip: "127.0.0.1"
 
-  # Create a private network, which allows host-only access to the machine
-  # using a specific IP.
-  # config.vm.network "private_network", ip: "192.168.33.10"
 
   # Create a public network, which generally matched to bridged network.
   # Bridged networks make the machine appear as another physical device on
