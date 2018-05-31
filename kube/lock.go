@@ -164,6 +164,7 @@ func (lock *Lock) modify(ctx context.Context, fn func(*runtime.Object) error) er
 		} else if err := fn(&object); err != nil {
 			return err
 		} else if err := lock.update(&object); err != nil && errors.IsConflict(err) {
+			log.Printf("kube/lock %v: retry modify conflict: %v", lock, err)
 			// retry
 		} else if err != nil {
 			return err
