@@ -172,6 +172,7 @@ func (k *Kube) clearLock() error {
 	return nil
 }
 
+// attempts to acquire the kube lock until the context expires
 func (k *Kube) AcquireLock(ctx context.Context) error {
 	if k == nil || k.lock == nil {
 		log.Printf("Skip kube locking")
@@ -180,7 +181,28 @@ func (k *Kube) AcquireLock(ctx context.Context) error {
 
 	log.Printf("Acquiring kube lock...")
 
-	return k.lock.Acquire(ctx)
+	var wait = 1 * time.Second
+	var waitFactor = 2
+	var maxWait = 1 * time.Minute
+
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		} else if err := k.lock.Acquire(ctx); err != nil {
+			log.Printf("Acquiring kube lock failed, retrying: %v", err)
+		} else {
+			return nil
+		}
+
+		// don't hammer the API server too hard...
+		time.Sleep(wait)
+
+		wait *= time.Duration(waitFactor)
+
+		if wait > maxWait {
+			wait = maxWait
+		}
+	}
 }
 
 func (k *Kube) ReleaseLock() error {
