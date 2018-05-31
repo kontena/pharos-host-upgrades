@@ -1,3 +1,7 @@
+workspace:
+  base: /go
+  path: src/github.com/kontena/pharos-host-upgrades
+
 pipeline:
   test:
     image: golang:1.10
