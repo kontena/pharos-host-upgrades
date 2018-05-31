@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -171,7 +172,7 @@ func (k *Kube) clearLock() error {
 	return nil
 }
 
-func (k *Kube) AcquireLock() error {
+func (k *Kube) AcquireLock(ctx context.Context) error {
 	if k == nil || k.lock == nil {
 		log.Printf("Skip kube locking")
 		return nil
@@ -179,7 +180,7 @@ func (k *Kube) AcquireLock() error {
 
 	log.Printf("Acquiring kube lock...")
 
-	return k.lock.Acquire()
+	return k.lock.Acquire(ctx)
 }
 
 func (k *Kube) ReleaseLock() error {

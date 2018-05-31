@@ -1,6 +1,7 @@
 package kube
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"time"
@@ -22,7 +23,6 @@ type Lock struct {
 	name       string
 	annotation string
 	value      string
-	timeout    time.Duration
 }
 
 func (lock *Lock) String() string {
@@ -159,8 +159,16 @@ func (lock *Lock) testEvent(event watch.Event) (bool, error) {
 	return false, nil
 }
 
+func contextTimeout(ctx context.Context) time.Duration {
+	if deadline, ok := ctx.Deadline(); !ok {
+		return time.Duration(0)
+	} else {
+		return deadline.Sub(time.Now())
+	}
+}
+
 // wait for lock to be free
-func (lock *Lock) wait() (runtime.Object, error) {
+func (lock *Lock) wait(ctx context.Context) (runtime.Object, error) {
 	log.Printf("kube/lock %v: wait", lock)
 
 	if obj, err := lock.get(); err != nil {
@@ -170,9 +178,11 @@ func (lock *Lock) wait() (runtime.Object, error) {
 		return obj, nil
 	} else if watcher, err := lock.watch(obj); err != nil {
 		return obj, err
-	} else if ev, err := watch.Until(lock.timeout, watcher, lock.testEvent); err != nil {
+	} else if ev, err := watch.Until(contextTimeout(ctx), watcher, lock.testEvent); err != nil {
+		log.Printf("kube/lock %v: wait err: %v", lock, err)
 		return obj, err
 	} else {
+		log.Printf("kube/lock %v: wait ok", lock)
 		return ev.Object, nil
 	}
 }
@@ -191,9 +201,12 @@ func (lock *Lock) acquire(object runtime.Object) error {
 }
 
 // wait for lock to free and acquire it
-func (lock *Lock) Acquire() error {
+func (lock *Lock) Acquire(ctx context.Context) error {
+	// XXX: watch timeout errors get lost: https://github.com/kubernetes/client-go/issues/427
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		if object, err := lock.wait(); err != nil {
+		if err := ctx.Err(); err != nil {
+			return err
+		} else if object, err := lock.wait(ctx); err != nil {
 			return err
 		} else if err := lock.acquire(object); err != nil {
 			return err
@@ -232,15 +245,5 @@ func (lock *Lock) Release() error {
 func (lock *Lock) cleanup() {
 	if err := lock.Release(); err != nil {
 		log.Printf("Failed to release lock %v: %v", lock, err)
-	}
-}
-
-func (lock *Lock) With(f func() error) error {
-	if err := lock.Acquire(); err != nil {
-		return fmt.Errorf("Failed to acquire lock %v: %v", lock, err)
-	} else {
-		defer lock.cleanup()
-
-		return f()
 	}
 }

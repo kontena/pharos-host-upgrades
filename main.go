@@ -58,7 +58,7 @@ func run(options Options) error {
 	}
 
 	return scheduler.Run(func(ctx context.Context) error {
-		if err := kube.AcquireLock(); err != nil {
+		if err := kube.AcquireLock(ctx); err != nil {
 			return fmt.Errorf("Failed to acquire kube lock: %v", err)
 		}
 
