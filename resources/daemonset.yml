@@ -22,6 +22,7 @@ spec:
             - pharos-host-upgrades
           args:
             - "--schedule=0 * * * *"
+            - --schedule-window=30s
             - --reboot
             - --drain
           env:
