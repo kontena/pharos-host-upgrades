@@ -7,14 +7,15 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/util/retry"
 )
 
 type Lock struct {
@@ -61,9 +62,12 @@ func (lock *Lock) test(object runtime.Object) (value string, available bool, acq
 }
 
 // set lock annotation
-func (lock *Lock) set(object runtime.Object) error {
-	if accessor, err := meta.Accessor(object); err != nil {
+// fails if not clear or acquired
+func (lock *Lock) set(object *runtime.Object) error {
+	if accessor, err := meta.Accessor(*object); err != nil {
 		panic(err)
+	} else if value := accessor.GetAnnotations()[lock.annotation]; value != "" && value != lock.value {
+		return fmt.Errorf("Busy lock: %v=%v", lock.annotation, value)
 	} else {
 		log.Printf("kube/lock %v: set %v=%v", lock, lock.annotation, lock.value)
 
@@ -75,8 +79,8 @@ func (lock *Lock) set(object runtime.Object) error {
 
 // clear lock annotation
 // fails if not set
-func (lock *Lock) clear(object runtime.Object) error {
-	if accessor, err := meta.Accessor(object); err != nil {
+func (lock *Lock) clear(object *runtime.Object) error {
+	if accessor, err := meta.Accessor(*object); err != nil {
 		panic(err)
 	} else if value := accessor.GetAnnotations()[lock.annotation]; value != lock.value {
 		return fmt.Errorf("Broken lock: %v=%v, expected %v", lock.annotation, value, lock.value)
@@ -146,6 +150,31 @@ func (lock *Lock) update(object *runtime.Object) error {
 	return nil
 }
 
+// get-modify-update the object
+// retries on conflict errors
+func (lock *Lock) modify(ctx context.Context, fn func(*runtime.Object) error) error {
+	var backoffDuration = 10 * time.Millisecond
+	var backoffFactor = 1.0
+
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		} else if object, err := lock.get(); err != nil {
+			return err
+		} else if err := fn(&object); err != nil {
+			return err
+		} else if err := lock.update(&object); err != nil && errors.IsConflict(err) {
+			// retry
+		} else if err != nil {
+			return err
+		} else {
+			return nil
+		}
+
+		time.Sleep(wait.Jitter(backoffDuration, backoffFactor))
+	}
+}
+
 func (lock *Lock) testEvent(event watch.Event) (bool, error) {
 	switch event.Type {
 	case watch.Modified:
@@ -168,45 +197,37 @@ func contextTimeout(ctx context.Context) time.Duration {
 }
 
 // wait for lock to be free
-func (lock *Lock) wait(ctx context.Context) (runtime.Object, error) {
+func (lock *Lock) wait(ctx context.Context, object *runtime.Object) error {
 	log.Printf("kube/lock %v: wait", lock)
 
-	if obj, err := lock.get(); err != nil {
-		return obj, err
-	} else if _, available, _ := lock.test(obj); available {
+	if _, available, _ := lock.test(*object); available {
 		// fastpath
-		return obj, nil
-	} else if watcher, err := lock.watch(obj); err != nil {
-		return obj, err
+		return nil
+	} else if watcher, err := lock.watch(*object); err != nil {
+		return err
 	} else if ev, err := watch.Until(contextTimeout(ctx), watcher, lock.testEvent); err != nil {
 		log.Printf("kube/lock %v: wait err: %v", lock, err)
-		return obj, err
+		return err
 	} else {
 		log.Printf("kube/lock %v: wait ok", lock)
-		return ev.Object, nil
-	}
-}
 
-// attempt to acquire lock, assuming it is free
-func (lock *Lock) acquire(object runtime.Object) error {
-	log.Printf("kube/lock %v: acquire", lock)
+		*object = ev.Object
 
-	if err := lock.set(object); err != nil {
-		return err
-	} else if err := lock.update(&object); err != nil {
-		return err
-	} else {
 		return nil
 	}
 }
 
+// attempt to acquire lock, assuming it is free
+func (lock *Lock) acquire(object *runtime.Object) error {
+	log.Printf("kube/lock %v: acquire", lock)
+
+	return lock.set(object)
+}
+
 // wait for lock to free and acquire it
 func (lock *Lock) Acquire(ctx context.Context) error {
-	// XXX: watch timeout errors get lost: https://github.com/kubernetes/client-go/issues/427
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		if err := ctx.Err(); err != nil {
-			return err
-		} else if object, err := lock.wait(ctx); err != nil {
+	return lock.modify(ctx, func(object *runtime.Object) error {
+		if err := lock.wait(ctx, object); err != nil {
 			return err
 		} else if err := lock.acquire(object); err != nil {
 			return err
@@ -217,28 +238,16 @@ func (lock *Lock) Acquire(ctx context.Context) error {
 }
 
 // attempt to clear lock, assuming it is locked
-func (lock *Lock) release(object runtime.Object) error {
+func (lock *Lock) release(object *runtime.Object) error {
 	log.Printf("kube/lock %v: release", lock)
 
-	if err := lock.clear(object); err != nil {
-		return err
-	} else if err := lock.update(&object); err != nil {
-		return err
-	} else {
-		return nil
-	}
+	return lock.clear(object)
 }
 
 // attempt to release lock, assuming it is set
 func (lock *Lock) Release() error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		if object, err := lock.get(); err != nil {
-			return err
-		} else if err := lock.release(object); err != nil {
-			return err
-		} else {
-			return nil
-		}
+	return lock.modify(context.Background(), func(object *runtime.Object) error {
+		return lock.release(object)
 	})
 }
 
