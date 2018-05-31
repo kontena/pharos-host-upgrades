@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"time"
@@ -11,12 +12,14 @@ import (
 type Scheduler struct {
 	option   string
 	schedule cron.Schedule
+	window   time.Duration
 	ch       chan time.Time
 }
 
 func makeScheduler(options Options) (Scheduler, error) {
 	var scheduler = Scheduler{
 		option: options.Schedule,
+		window: options.ScheduleWindow,
 		ch:     make(chan time.Time),
 	}
 
@@ -33,17 +36,38 @@ func makeScheduler(options Options) (Scheduler, error) {
 	return scheduler, nil
 }
 
-func (scheduler *Scheduler) run(f func() error) {
+func (scheduler *Scheduler) run(f func(ctx context.Context) error) {
 	initTime := time.Now()
 	nextTime := scheduler.schedule.Next(initTime)
 
 	log.Printf("Using --schedule=%#v, first upgrade at: %v (in %v)", scheduler.option, nextTime, nextTime.Sub(initTime))
 
+	if scheduler.window != 0 {
+		log.Printf("Using --schedule-window=%v", scheduler.window)
+	}
+
 	for startTime := range scheduler.ch {
-		if err := f(); err != nil {
-			// TODO: break out of scheduler loop instead?
-			log.Fatalf("%v", err)
-		}
+		func() {
+			ctx := context.Background()
+
+			if scheduler.window != 0 {
+				deadline := startTime.Add(scheduler.window)
+				deadlineCtx, cancelCtx := context.WithDeadline(ctx, deadline)
+
+				log.Printf("Schedule run started, deadline at %v", deadline)
+
+				ctx = deadlineCtx
+				defer cancelCtx()
+			} else {
+				log.Printf("Schedule run started, no deadline")
+
+			}
+
+			if err := f(ctx); err != nil {
+				// TODO: break out of scheduler loop instead?
+				log.Fatalf("%v", err)
+			}
+		}()
 
 		endTime := time.Now()
 		nextTime := scheduler.schedule.Next(endTime)
@@ -61,9 +85,9 @@ func (scheduler *Scheduler) trigger() {
 	}
 }
 
-func (scheduler Scheduler) Run(f func() error) error {
+func (scheduler Scheduler) Run(f func(ctx context.Context) error) error {
 	if scheduler.schedule == nil {
-		return f()
+		return f(context.Background())
 	} else {
 		defer close(scheduler.ch)
 		go scheduler.run(f)

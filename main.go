@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -9,15 +10,17 @@ import (
 )
 
 const DefaultRebootTimeout = 5 * time.Minute
+const DefaultScheduleWindow = 1 * time.Hour
 
 type Options struct {
-	ConfigPath    string
-	HostMount     string
-	Schedule      string
-	Reboot        bool
-	RebootTimeout time.Duration
-	Drain         bool
-	Kube          KubeOptions
+	ConfigPath     string
+	HostMount      string
+	Schedule       string
+	ScheduleWindow time.Duration
+	Reboot         bool
+	RebootTimeout  time.Duration
+	Drain          bool
+	Kube           KubeOptions
 }
 
 func run(options Options) error {
@@ -54,11 +57,12 @@ func run(options Options) error {
 		log.Printf("Skipping host reboot after upgrades")
 	}
 
-	return scheduler.Run(func() error {
-		if err := kube.AcquireLock(); err != nil {
+	return scheduler.Run(func(ctx context.Context) error {
+		if err := kube.AcquireLock(ctx); err != nil {
 			return fmt.Errorf("Failed to acquire kube lock: %v", err)
 		}
 
+		// runs with the kube lock held
 		rebooting, err := func() (bool, error) {
 			log.Printf("Running host upgrades...")
 
@@ -146,6 +150,7 @@ func main() {
 	flag.StringVar(&options.ConfigPath, "config-path", "/etc/host-upgrades", "Path to configmap dir")
 	flag.StringVar(&options.HostMount, "host-mount", "/run/host-upgrades", "Path to shared mount with host. Must be under /run to reset when rebooting!")
 	flag.StringVar(&options.Schedule, "schedule", "", "Scheduled upgrade (cron syntax)")
+	flag.DurationVar(&options.ScheduleWindow, "schedule-window", DefaultScheduleWindow, "Set a deadline for the scheduled upgrade to start (duration syntax)")
 	flag.BoolVar(&options.Reboot, "reboot", false, "Reboot if required")
 	flag.DurationVar(&options.RebootTimeout, "reboot-timeout", DefaultRebootTimeout, "Wait for system to shutdown when rebooting")
 	flag.BoolVar(&options.Drain, "drain", false, "Drain kube node before reboot, uncordon after reboot")
