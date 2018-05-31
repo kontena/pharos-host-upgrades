@@ -11,19 +11,20 @@ pipeline:
   docker-edge:
     registry: quay.io
     image: plugins/docker
+    dockerfile: Dockerfile
     secrets: [ docker_username, docker_password ]
     repo: quay.io/kontena/pharos-host-upgrades
     tags: edge
-    dockerfile: Dockerfile
     when:
       branch: master
 
+  # build and deploy quay.io/kontena/pharos-host-upgrades:latest from master branch tags
   docker:
     registry: quay.io
     image: plugins/docker
+    dockerfile: Dockerfile
     secrets: [ docker_username, docker_password ]
     repo: quay.io/kontena/pharos-host-upgrades
-    dockerfile: Dockerfile
     auto_tag: true
     when:
       event: tag
