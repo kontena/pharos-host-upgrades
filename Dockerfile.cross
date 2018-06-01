@@ -15,7 +15,7 @@ COPY Gopkg.* ./
 RUN dep ensure -vendor-only
 
 COPY . ./
-RUN GOOS=linux GOARCH=${ARCH} go install -v .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${ARCH} go install -v .
 
 
 # download kubectl
