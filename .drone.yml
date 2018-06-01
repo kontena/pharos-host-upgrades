@@ -11,24 +11,51 @@ pipeline:
       - dep ensure -vendor-only
       - go test -v ./...
 
-  # build and deploy quay.io/kontena/pharos-host-upgrades:edge from master branch
-  docker-edge:
+  # build and deploy quay.io/kontena/pharos-host-upgrades-amd64:edge from master branch
+  docker-edge-amd64:
     registry: quay.io
     image: plugins/docker
     dockerfile: Dockerfile
     secrets: [ docker_username, docker_password ]
-    repo: quay.io/kontena/pharos-host-upgrades
+    repo: quay.io/kontena/pharos-host-upgrades-amd64
     tags: edge
     when:
       branch: master
 
-  # build and deploy quay.io/kontena/pharos-host-upgrades:latest from master branch tags
-  docker:
+  # build and deploy quay.io/kontena/pharos-host-upgrades-arm64:edge from master branch
+  docker-edge-arm64:
+    registry: quay.io
+    image: plugins/docker
+    dockerfile: Dockerfile.cross
+    build_args:
+      - ARCH=arm64
+    secrets: [ docker_username, docker_password ]
+    repo: quay.io/kontena/pharos-host-upgrades-arm64
+    tags: edge
+    when:
+      branch: master
+
+
+  # build and deploy quay.io/kontena/pharos-host-upgrades-amd64:latest from master branch tags
+  docker-amd64:
     registry: quay.io
     image: plugins/docker
     dockerfile: Dockerfile
     secrets: [ docker_username, docker_password ]
-    repo: quay.io/kontena/pharos-host-upgrades
+    repo: quay.io/kontena/pharos-host-upgrades-amd64
+    auto_tag: true
+    when:
+      event: tag
+
+  # build and deploy quay.io/kontena/pharos-host-upgrades-arm46:latest from master branch tags
+  docker-arm64:
+    registry: quay.io
+    image: plugins/docker
+    dockerfile: Dockerfile.cross
+    build_args:
+      - ARCH=arm64
+    secrets: [ docker_username, docker_password ]
+    repo: quay.io/kontena/pharos-host-upgrades-arm64
     auto_tag: true
     when:
       event: tag
