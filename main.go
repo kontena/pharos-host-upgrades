@@ -146,6 +146,9 @@ func run(options Options) error {
 
 func main() {
 	var options Options
+	var version bool
+
+	flag.BoolVar(&version, "version", false, "Show version")
 
 	flag.StringVar(&options.ConfigPath, "config-path", "/etc/host-upgrades", "Path to configmap dir")
 	flag.StringVar(&options.HostMount, "host-mount", "/run/host-upgrades", "Path to shared mount with host. Must be under /run to reset when rebooting!")
@@ -159,6 +162,12 @@ func main() {
 	flag.StringVar(&options.Kube.DaemonSet, "kube-daemonset", os.Getenv("KUBE_DAEMONSET"), "Name of kube DaemonSet (KUBE_DAEMONSET)")
 	flag.StringVar(&options.Kube.Node, "kube-node", os.Getenv("KUBE_NODE"), "Name of kube Node (KUBE_NODE)")
 	flag.Parse()
+
+	log.Printf("pharos-host-upgrades version %v (Go %v)", Version, GoVersion)
+
+	if version {
+		os.Exit(0)
+	}
 
 	if err := run(options); err != nil {
 		log.Fatalf("%v", err)
