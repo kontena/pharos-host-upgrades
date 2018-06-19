@@ -27,7 +27,7 @@ func makeScheduler(options Options) (Scheduler, error) {
 		log.Printf("No --schedule given, will run once")
 
 		return scheduler, nil
-	} else if schedule, err := cron.Parse(options.Schedule); err != nil {
+	} else if schedule, err := cron.ParseStandard(options.Schedule); err != nil {
 		return scheduler, fmt.Errorf("Invalid --schedule=%v: %v", options.Schedule, err)
 	} else {
 		scheduler.schedule = schedule
