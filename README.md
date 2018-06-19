@@ -136,13 +136,15 @@ command terminated with exit code 2
 
 #### `--schedule`
 
-See https://godoc.org/github.com/robfig/cron#hdr-CRON_Expression_Format
+See https://godoc.org/github.com/robfig/cron#hdr-CRON_Expression_Format (no seconds field).
 
-Variant of a standard crontab with a leading seconds field.
+Standard crontab with five fields (Minutes, Hours, Day of month, Month, Day of week).
 
 Examples:
 
-* `0 15 5 * * *` - every day at 05:15:00
+* `15 5 * * *` - every day at 05:15
+* `1 0 * * SUN` - every sunday at 01:00
+* `@daily` at midnight
 
 #### `--reboot` `--reboot-timeout=...`
 
