@@ -21,7 +21,7 @@ spec:
           command:
             - pharos-host-upgrades
           args:
-            - "--schedule=0 * * * *"
+            - "--schedule=* * * * *"
             - --schedule-window=30s
             - --reboot
             - --drain
