@@ -11,7 +11,7 @@
     "sdjournal"
   ]
   revision = "e146b7a178ebd21a356d31964f8f57fd15458844"
-  source = "https://github.com/SpComb/go-systemd.git"
+  source = "https://github.com/kontena/go-systemd.git"
 
 [[projects]]
   name = "github.com/coreos/pkg"
@@ -270,6 +270,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "c2681346c1b6931c539ffb0a84adb79b403c5e2301edc4a74f1f71d5efb16d7b"
+  inputs-digest = "92402774d93513d5e4b86b9c9161bac186d40cc10e449bd02e10af60bb45f1a4"
   solver-name = "gps-cdcl"
   solver-version = 1

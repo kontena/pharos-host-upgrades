@@ -31,7 +31,7 @@
 
 [[constraint]]
   name = "github.com/coreos/go-systemd"
-  source = "https://github.com/SpComb/go-systemd.git"
+  source = "https://github.com/kontena/go-systemd.git"
   branch = "feature/hostname1"
   #version = "17.0.0"
 
