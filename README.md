@@ -6,7 +6,7 @@ See [`resources`](./resources) for example kube manifests.
 
 ### Supported host OS configurations
 
-#### Ubuntu 16.04
+#### Ubuntu 16.04 & Debia 9.x
 
     apt-get install unattended-upgrades
 
