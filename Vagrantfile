@@ -26,6 +26,14 @@ Vagrant.configure("2") do |config|
     machine.vm.network "private_network", ip: "192.168.56.12"
   end
 
+  # Debian
+  config.vm.define "debian-9" do |machine|
+    machine.vm.box = "debian/stretch64"
+    machine.vm.hostname = "debian-9"
+    machine.vm.provision "shell", path: 'scripts/vagrant/provision-debian.sh'
+    machine.vm.network "private_network", ip: "192.168.56.12"
+  end
+
   # Disable automatic box update checking. If you disable this, then
   # boxes will only be checked for updates when the user runs
   # `vagrant box outdated`. This is not recommended.

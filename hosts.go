@@ -6,6 +6,7 @@ import (
 
 	"github.com/kontena/pharos-host-upgrades/hosts"
 	"github.com/kontena/pharos-host-upgrades/hosts/centos"
+	"github.com/kontena/pharos-host-upgrades/hosts/debian"
 	"github.com/kontena/pharos-host-upgrades/hosts/ubuntu"
 )
 
@@ -13,6 +14,7 @@ func probeHost(options Options) (hosts.Host, hosts.Info, error) {
 	var probeHosts = []hosts.Host{
 		&ubuntu.Host{},
 		&centos.Host{},
+		&debian.Host{},
 	}
 
 	for _, host := range probeHosts {
