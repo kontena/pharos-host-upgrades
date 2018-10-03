@@ -6,7 +6,7 @@ See [`resources`](./resources) for example kube manifests.
 
 ### Supported host OS configurations
 
-#### Ubuntu 16.04
+#### Ubuntu 16.04 & Debia 9.x
 
     apt-get install unattended-upgrades
 
@@ -192,7 +192,7 @@ Using the vagrant machines:
     $ vagrant up ubuntu
     $ vagrant up centos-7
 
-Note that the `centos/7` box does not support shared folders... vagrant falls back to rsync, so you must `vagrant rsync centos-7` before building the image after any edits.
+Note that the `centos/7` & `debian/stretch64` boxes do not support shared folders... vagrant falls back to rsync, so you must `vagrant rsync centos-7` or `vagrant rsync debian-9` before building the image after any edits.
 
 ### Setup
 
