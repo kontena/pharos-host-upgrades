@@ -6,7 +6,7 @@ See [`resources`](./resources) for example kube manifests.
 
 ### Supported host OS configurations
 
-#### Ubuntu 16.04 & Debia 9.x
+#### Ubuntu 16.04/18.04 & Debian 9.x
 
     apt-get install unattended-upgrades
 
@@ -71,6 +71,7 @@ The `HostUpgradesReboot` condition will be `True` if the host requires a reboot 
 ### Supported Kube Versions
 
  * Kubernetes 1.10
+ * Kubernetes 1.11
 
 ## Usage
 
